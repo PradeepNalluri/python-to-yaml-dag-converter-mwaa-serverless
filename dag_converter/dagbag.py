@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 
 from airflow.models.dag import DAG
@@ -6,6 +7,14 @@ from airflow.models.dagbag import DagBag
 
 def get_dag_object(dag_file_path: Path) -> list[DAG]:
     """Load the Dags using DagBag and retrieve the Dag objects"""
+    dag_file_path = dag_file_path.resolve()
+
+    # Add the DAG file's directory to sys.path so sibling modules can be imported since
+    # for python there can be more than one module
+    dag_dir = str(dag_file_path.parent)
+    if dag_dir not in sys.path:
+        sys.path.insert(0, dag_dir)
+
     dagbag = DagBag(dag_folder=dag_file_path, include_examples=False)
     found_dags = list(dagbag.dags.values())
 

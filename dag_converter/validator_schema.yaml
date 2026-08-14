@@ -355,6 +355,10 @@ task:
     "airflow.providers.amazon.aws.operators.mwaa.MwaaTriggerDagRunOperator",
     "airflow.providers.amazon.aws.transfers.s3_to_redshift.S3ToRedshiftOperator",
     "airflow.providers.common.sql.operators.sql.SQLTableCheckOperator",
+    "airflow.operators.python.PythonOperator",
+    "airflow.providers.standard.operators.python.PythonOperator",
+    "airflow.operators.bash.BashOperator",
+    "airflow.providers.standard.operators.bash.BashOperator",
     required=False)
 
   dependencies: list(str(), required=False)
