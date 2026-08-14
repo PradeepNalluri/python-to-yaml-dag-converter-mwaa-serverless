@@ -2,7 +2,20 @@ trigger_scale_up:
   dag_id: trigger_scale_up
   params: {}
   default_args:
-    start_date: '2026-01-01'
-  schedule: 0,30 * * * ? *
+    start_date:
+      __type__: datetime.datetime
+      year: 2026
+      month: 1
+      day: 1
+  schedule: 0,30 * * * *
   tasks: {}
+  catchup: false
+  dag_display_name: trigger_scale_up
   is_paused_upon_creation: false
+  owner_links: {}
+  start_date:
+    __type__: datetime.datetime
+    year: 2026
+    month: 1
+    day: 1
+  tags: []

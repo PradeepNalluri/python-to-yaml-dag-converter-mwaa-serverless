@@ -2,18 +2,28 @@ test-dag:
   dag_id: test-dag
   params: {}
   default_args:
-    start_date: '2026-12-01'
+    start_date:
+      __type__: datetime.datetime
+      year: 2026
+      month: 12
+      day: 1
   schedule: '@once'
   tasks:
     task0-0:
       operator: airflow.providers.standard.operators.bash.BashOperator
       bash_command: sleep 10
       outlets: []
-      params: {}
       priority_weight: 1
       retries: 2
-      retry_delay: 60.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 60.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 12
+        day: 1
       task_id: task0-0
       trigger_rule: all_success
       wait_for_downstream: false
@@ -22,26 +32,49 @@ test-dag:
       operator: airflow.providers.standard.operators.bash.BashOperator
       bash_command: sleep 10
       outlets: []
-      params: {}
       priority_weight: 1
       retries: 2
-      retry_delay: 60.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 60.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 12
+        day: 1
       task_id: task1-0
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [task0-0]
+      dependencies:
+      - task0-0
     task2-0:
       operator: airflow.providers.standard.operators.bash.BashOperator
       bash_command: sleep 10
       outlets: []
-      params: {}
       priority_weight: 1
       retries: 2
-      retry_delay: 60.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 60.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 12
+        day: 1
       task_id: task2-0
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [task1-0]
+      dependencies:
+      - task1-0
+  catchup: false
+  dag_display_name: test-dag
   is_paused_upon_creation: false
+  owner_links: {}
+  start_date:
+    __type__: datetime.datetime
+    year: 2026
+    month: 12
+    day: 1
+  tags: []

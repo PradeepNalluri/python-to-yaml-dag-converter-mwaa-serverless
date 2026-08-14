@@ -3,20 +3,32 @@ dynamic_dag_sales:
   params: {}
   default_args:
     owner: airflow
-    start_date: '2026-01-01'
+    start_date:
+      __type__: datetime.datetime
+      year: 2026
+      month: 1
+      day: 1
     retries: 1
-    retry_delay: 300.0
-  schedule: 0 1 * * ? *
+    retry_delay:
+      __type__: datetime.timedelta
+      seconds: 300.0
+  schedule: 0 1 * * *
   tasks:
     start:
       operator: airflow.providers.standard.operators.bash.BashOperator
-      bash_command: echo 'Starting processing for sales'
+      bash_command: "echo 'Starting processing for sales'"
       outlets: []
-      params: {}
       priority_weight: 1
       retries: 1
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: start
       trigger_rule: all_success
       wait_for_downstream: false
@@ -27,59 +39,98 @@ dynamic_dag_sales:
       op_kwargs:
         data_source: /data/sales/transactions
       outlets: []
-      params: {}
       priority_weight: 1
       python_callable: dag_gen_config.process_data
       retries: 1
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: process_transactions
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [start]
+      dependencies:
+      - start
     process_customers:
       operator: airflow.providers.standard.operators.python.PythonOperator
       op_args: []
       op_kwargs:
         data_source: /data/sales/customers
       outlets: []
-      params: {}
       priority_weight: 1
       python_callable: dag_gen_config.process_data
       retries: 1
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: process_customers
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [start]
+      dependencies:
+      - start
     process_products:
       operator: airflow.providers.standard.operators.python.PythonOperator
       op_args: []
       op_kwargs:
         data_source: /data/sales/products
       outlets: []
-      params: {}
       priority_weight: 1
       python_callable: dag_gen_config.process_data
       retries: 1
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: process_products
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [start]
+      dependencies:
+      - start
     end:
       operator: airflow.providers.standard.operators.bash.BashOperator
-      bash_command: echo 'Completed processing for sales'
+      bash_command: "echo 'Completed processing for sales'"
       outlets: []
-      params: {}
       priority_weight: 1
       retries: 1
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: end
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [process_transactions, process_customers, process_products]
+      dependencies:
+      - process_products
+      - process_transactions
+      - process_customers
+  catchup: false
+  dag_display_name: dynamic_dag_sales
   description: Dynamically generated DAG for sales
+  owner_links: {}
+  start_date:
+    __type__: datetime.datetime
+    year: 2026
+    month: 1
+    day: 1
+  tags: []

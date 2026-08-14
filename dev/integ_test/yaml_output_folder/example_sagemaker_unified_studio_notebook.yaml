@@ -7,8 +7,17 @@ example_sagemaker_unified_studio_notebook:
     notebook-task:
       operator: airflow.providers.amazon.aws.operators.sagemaker_unified_studio_notebook.SageMakerUnifiedStudioNotebookOperator
       aws_conn_id: aws_datazone_notebook
+      client_token: idempotency-token-1786668668
+      compute_configuration:
+        instanceType: sc.m5.large
       deferrable: false
+      domain_identifier: DOMAIN_ID
+      notebook_identifier: NOTEBOOK_ID
+      notebook_parameters:
+        param1: value1
+        param2: value2
       outlets: []
+      owning_project_identifier: PROJECT_ID
       priority_weight: 1
       retries: 0
       retry_delay:
@@ -21,6 +30,8 @@ example_sagemaker_unified_studio_notebook:
         month: 1
         day: 1
       task_id: notebook-task
+      timeout_configuration:
+        runTimeoutInMinutes: 1440
       trigger_rule: all_success
       wait_for_completion: true
       wait_for_downstream: false
@@ -29,8 +40,13 @@ example_sagemaker_unified_studio_notebook:
     notebook-sensor-task:
       operator: airflow.providers.amazon.aws.sensors.sagemaker_unified_studio_notebook.SageMakerUnifiedStudioNotebookSensor
       aws_conn_id: aws_datazone_notebook
+      domain_identifier: DOMAIN_ID
       mode: poke
+      notebook_identifier: NOTEBOOK_ID
+      notebook_run_id: "{{ task_instance.xcom_pull(task_ids='notebook-task', key='notebook_run_id')\
+        \ }}"
       outlets: []
+      owning_project_identifier: PROJECT_ID
       poke_interval: 60.0
       priority_weight: 1
       retries: 0
@@ -53,7 +69,10 @@ example_sagemaker_unified_studio_notebook:
       operator: airflow.providers.amazon.aws.operators.sagemaker_unified_studio_notebook.SageMakerUnifiedStudioNotebookOperator
       aws_conn_id: aws_datazone_notebook
       deferrable: false
+      domain_identifier: DOMAIN_ID
+      notebook_identifier: NOTEBOOK_ID
       outlets: []
+      owning_project_identifier: PROJECT_ID
       priority_weight: 1
       retries: 0
       retry_delay:
@@ -76,7 +95,15 @@ example_sagemaker_unified_studio_notebook:
       operator: airflow.providers.amazon.aws.operators.sagemaker_unified_studio_notebook.SageMakerUnifiedStudioNotebookOperator
       aws_conn_id: aws_datazone_notebook
       deferrable: false
+      domain_identifier: DOMAIN_ID
+      notebook_identifier: NOTEBOOK_B_ID
+      notebook_parameters:
+        employee_name: "{{ task_instance.xcom_pull(task_ids='notebook-a-task', key='NOTEBOOK_OUTPUT.name')\
+          \ }}"
+        employee_age: "{{ task_instance.xcom_pull(task_ids='notebook-a-task', key='NOTEBOOK_OUTPUT.age')\
+          \ }}"
       outlets: []
+      owning_project_identifier: PROJECT_ID
       priority_weight: 1
       retries: 0
       retry_delay:

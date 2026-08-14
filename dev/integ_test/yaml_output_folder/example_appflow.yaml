@@ -2,7 +2,11 @@ example_appflow:
   dag_id: example_appflow
   params: {}
   default_args:
-    start_date: '2026-01-01'
+    start_date:
+      __type__: datetime.datetime
+      year: 2026
+      month: 1
+      day: 1
   schedule: '@once'
   tasks:
     campaign_dump_full:
@@ -11,13 +15,19 @@ example_appflow:
       flow_name: test-salesforce-campaign
       max_attempts: 60
       outlets: []
-      params: {}
       poll_interval: 20
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
       source: salesforce
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: campaign_dump_full
       trigger_rule: all_success
       wait_for_completion: true
@@ -30,19 +40,26 @@ example_appflow:
       flow_name: test-salesforce-campaign
       max_attempts: 60
       outlets: []
-      params: {}
       poll_interval: 20
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
       source: salesforce
       source_field: LastModifiedDate
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: campaign_dump_daily
       trigger_rule: all_success
       wait_for_completion: true
       wait_for_downstream: false
-      dependencies: [campaign_dump_full]
+      dependencies:
+      - campaign_dump_full
     campaign_dump_before:
       operator: airflow.providers.amazon.aws.operators.appflow.AppflowRunBeforeOperator
       aws_conn_id: aws_default
@@ -50,19 +67,26 @@ example_appflow:
       flow_name: test-salesforce-campaign
       max_attempts: 60
       outlets: []
-      params: {}
       poll_interval: 20
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
       source: salesforce
       source_field: LastModifiedDate
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: campaign_dump_before
       trigger_rule: all_success
       wait_for_completion: true
       wait_for_downstream: false
-      dependencies: [campaign_dump_daily]
+      dependencies:
+      - campaign_dump_daily
     campaign_dump_after:
       operator: airflow.providers.amazon.aws.operators.appflow.AppflowRunAfterOperator
       aws_conn_id: aws_default
@@ -70,19 +94,26 @@ example_appflow:
       flow_name: test-salesforce-campaign
       max_attempts: 60
       outlets: []
-      params: {}
       poll_interval: 20
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
       source: salesforce
       source_field: LastModifiedDate
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: campaign_dump_after
       trigger_rule: all_success
       wait_for_completion: true
       wait_for_downstream: false
-      dependencies: [campaign_dump_before]
+      dependencies:
+      - campaign_dump_before
     campaign_dump_short_circuit:
       operator: airflow.providers.amazon.aws.operators.appflow.AppflowRecordsShortCircuitOperator
       aws_conn_id: aws_default
@@ -92,28 +123,51 @@ example_appflow:
         flow_name: test-salesforce-campaign
         appflow_run_task_id: campaign_dump_after
       outlets: []
-      params: {}
       priority_weight: 1
       python_callable: airflow.providers.amazon.aws.operators.appflow._has_new_records_func
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: campaign_dump_short_circuit
       trigger_rule: all_success
       wait_for_downstream: false
       flow_name: test-salesforce-campaign
       appflow_run_task_id: campaign_dump_after
-      dependencies: [campaign_dump_after]
+      dependencies:
+      - campaign_dump_after
     should_be_skipped:
       operator: airflow.providers.standard.operators.bash.BashOperator
       bash_command: echo 1
       outlets: []
-      params: {}
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: should_be_skipped
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [campaign_dump_short_circuit]
+      dependencies:
+      - campaign_dump_short_circuit
+  catchup: false
+  dag_display_name: example_appflow
+  owner_links: {}
+  start_date:
+    __type__: datetime.datetime
+    year: 2026
+    month: 1
+    day: 1
+  tags: []
