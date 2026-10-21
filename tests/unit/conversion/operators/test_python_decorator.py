@@ -1,5 +1,4 @@
 import unittest
-from unittest.mock import Mock
 
 from dag_converter.conversion.operators.python_decorator import (
     cleanup_xcom,
@@ -10,9 +9,8 @@ from dag_converter.conversion.operators.python_decorator import (
 
 
 class TestHandlePythonDecorator(unittest.TestCase):
-    def setUp(self):
-        self.mock_taskflow_parser = Mock()
-        self.mock_taskflow_parser.task_functions = {"test_function": ["param1", "param2", "param3"]}
+    DECORATOR = "airflow.providers.standard.decorators.python.python_task"
+    PARAMETERS = ["param1", "param2", "param3"]
 
     def test_basic_conversion(self):
         """Test basic python decorator conversion"""
@@ -21,10 +19,11 @@ class TestHandlePythonDecorator(unittest.TestCase):
             "python_callable": "test_file.test_function",
         }
 
-        handle_python_decorator(task_dict, self.mock_taskflow_parser)
+        handle_python_decorator(task_dict, self.DECORATOR, self.PARAMETERS)
 
         self.assertNotIn("operator", task_dict)
-        self.assertEqual(task_dict["decorator"], "airflow.decorators.task")
+        self.assertEqual(task_dict["decorator"], self.DECORATOR)
+        self.assertEqual(next(iter(task_dict)), "decorator")
 
     def test_op_args_op_kwargs_handling(self):
         """Test handling of op_args and op_kwargs"""
@@ -35,7 +34,7 @@ class TestHandlePythonDecorator(unittest.TestCase):
             "op_kwargs": {"param3": "value3"},
         }
 
-        handle_python_decorator(task_dict, self.mock_taskflow_parser)
+        handle_python_decorator(task_dict, self.DECORATOR, self.PARAMETERS)
 
         self.assertEqual(task_dict["param1"], "value1")
         self.assertEqual(task_dict["param2"], "value2")
@@ -51,7 +50,7 @@ class TestHandlePythonDecorator(unittest.TestCase):
             "partial": {"op_args": ["value1"], "op_kwargs": {"param2": "value2"}},
         }
 
-        handle_python_decorator(task_dict, self.mock_taskflow_parser)
+        handle_python_decorator(task_dict, self.DECORATOR, self.PARAMETERS)
 
         self.assertEqual(task_dict["partial"]["param1"], "value1")
         self.assertEqual(task_dict["partial"]["param2"], "value2")
@@ -66,9 +65,22 @@ class TestHandlePythonDecorator(unittest.TestCase):
             "partial": {"other_param": "value"},
         }
 
-        handle_python_decorator(task_dict, self.mock_taskflow_parser)
+        handle_python_decorator(task_dict, self.DECORATOR, self.PARAMETERS)
 
         self.assertEqual(task_dict["partial"]["other_param"], "value")
+
+    def test_only_op_kwargs(self):
+        """Test keyword arguments are moved when there are no positional arguments"""
+        task_dict = {
+            "operator": "airflow.decorators.python._PythonDecoratedOperator",
+            "python_callable": "test_file.test_function",
+            "op_kwargs": {"param2": "task_instance.xcom_pull(task_ids='upstream')"},
+        }
+
+        handle_python_decorator(task_dict, self.DECORATOR, self.PARAMETERS)
+
+        self.assertEqual(task_dict["param2"], "+upstream")
+        self.assertNotIn("op_kwargs", task_dict)
 
 
 class TestExtractOpArgs(unittest.TestCase):

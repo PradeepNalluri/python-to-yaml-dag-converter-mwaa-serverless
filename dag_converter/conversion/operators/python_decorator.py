@@ -1,45 +1,44 @@
 import re
 from typing import Any
 
-from dag_converter.taskflow_parser import TaskFlowAnalyzer
 
+def handle_python_decorator(task_dict: dict[str, Any], decorator_import_path: str, parameter_names: list[str]):
+    """
+    Handle special conversion for TaskFlow decorators
 
-def handle_python_decorator(task_dict: dict[str, Any], taskflow_parser: TaskFlowAnalyzer):
-    """Handle special conversion for taskflow python decorators"""
+    Args:
+        task_dict: Converted task, with python callables and XComArgs already cleaned up
+        decorator_import_path: Import path of the decorator,
+            e.g. airflow.providers.standard.decorators.python.python_task
+        parameter_names: Parameter names of the decorated python callable, in positional order
+    """
+    # Replace 'operator' with 'decorator', keeping it as the first key
     del task_dict["operator"]
-    task_dict["decorator"] = "airflow.decorators.task"
-
-    # Should be of the form <file_name>.<function_name>
-    function_name = task_dict["python_callable"].split(".", 1)[1]
-    parameters = taskflow_parser.task_functions[function_name]
+    task_arguments = dict(task_dict)
+    task_dict.clear()
+    task_dict["decorator"] = decorator_import_path
+    task_dict.update(task_arguments)
 
     # DagFactory does not support having the parameters within 'op_args' or 'op_kwargs'
     # Move the parameters within 'op_args' and 'op_kwargs' up one level
-    if "op_args" in task_dict and "op_kwargs" in task_dict:
-        op_args = extract_op_args(task_dict["op_args"])
-        op_kwargs = extract_op_kwargs(task_dict["op_kwargs"])
-
-        # Iterate through positional arguments first
-        for i in range(len(op_args)):
-            task_dict[parameters[i]] = op_args[i]
-        for k, v in op_kwargs.items():
-            task_dict[k] = v
-        del task_dict["op_args"]
-        del task_dict["op_kwargs"]
+    move_call_arguments(task_dict, parameter_names)
 
     # Handle 'partial' during DTM specifically for TaskFlow
     # Move parameters up one level
     if "partial" in task_dict:
-        op_args = extract_op_args(task_dict["partial"].get("op_args", []))
-        op_kwargs = extract_op_kwargs(task_dict["partial"].get("op_kwargs", {}))
-        for i in range(len(op_args)):
-            task_dict["partial"][parameters[i]] = op_args[i]
-        for k, v in op_kwargs.items():
-            task_dict["partial"][k] = v
-        if "op_args" in task_dict["partial"]:
-            del task_dict["partial"]["op_args"]
-        if "op_kwargs" in task_dict["partial"]:
-            del task_dict["partial"]["op_kwargs"]
+        move_call_arguments(task_dict["partial"], parameter_names)
+
+
+def move_call_arguments(arguments: dict[str, Any], parameter_names: list[str]):
+    """Replace 'op_args' and 'op_kwargs' with the callable parameters they are passed to"""
+    op_args = extract_op_args(arguments.pop("op_args", None) or [])
+    op_kwargs = extract_op_kwargs(arguments.pop("op_kwargs", None) or {})
+
+    # Iterate through positional arguments first
+    for i, value in enumerate(op_args):
+        arguments[parameter_names[i]] = value
+    for k, v in op_kwargs.items():
+        arguments[k] = v
 
 
 def extract_op_args(op_args_str):

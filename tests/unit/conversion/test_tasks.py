@@ -1,7 +1,6 @@
 import unittest
 from unittest.mock import Mock, patch
 
-from airflow.providers.standard.decorators.python import _PythonDecoratedOperator
 from airflow.sdk.definitions.mappedoperator import MappedOperator
 
 from dag_converter.conversion.tasks import convert_tasks, get_operator_parameters
@@ -51,38 +50,6 @@ class TestConvertTasks(unittest.TestCase):
             }
         }
         self.assertEqual(result, expected)
-
-    @unittest.skip("Python operators not supported")
-    @patch("dag_converter.conversion.tasks.get_cleanup_dag")
-    @patch("dag_converter.conversion.tasks.handle_python_decorator")
-    @patch("dag_converter.conversion.tasks.get_operator_parameters")
-    def test_python_decorated_operator(self, mock_get_params, mock_handle_python, mock_cleanup):
-        """Test Python decorated operator handling"""
-        mock_get_params.return_value = ["python_callable"]
-        mock_cleanup.return_value = {
-            "operator": "airflow.decorators.python._PythonDecoratedOperator",
-            "python_callable": "test.func",
-            "dependencies": [],
-        }
-        self.mock_validator.validate_field.return_value = True
-
-        task = Mock(spec=_PythonDecoratedOperator)
-        task.task_id = "python_task"
-        task.task_type = "_PythonDecoratedOperator"
-        task.__module__ = "airflow.decorators.python"
-        task.upstream_task_ids = []
-        task._is_mapped = False
-        task.python_callable = "func"
-        task._BaseOperator__init_kwargs = {}
-        del task._task_module
-
-        with patch("builtins.dir", return_value=["task_id", "task_type", "python_callable"]):
-            self.mock_dag_object.tasks = [task]
-
-            convert_tasks(self.mock_taskflow_parser, self.mock_dag_object, "test.py", self.mock_validator)
-
-        mock_cleanup.assert_called()
-        mock_handle_python.assert_called()
 
     @patch("dag_converter.conversion.tasks.get_cleanup_dag")
     @patch("dag_converter.conversion.tasks.handle_python_decorator")

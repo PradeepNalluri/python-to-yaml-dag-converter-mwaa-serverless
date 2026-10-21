@@ -1,10 +1,11 @@
 import importlib
 import inspect
+from enum import Enum
 from pathlib import Path
 
 from airflow.models.dag import DAG
 from airflow.models.operator import Operator
-from airflow.providers.standard.decorators.python import _PythonDecoratedOperator
+from airflow.sdk.bases.decorator import DecoratedOperator
 from airflow.sdk.definitions.mappedoperator import MappedOperator
 from airflow.utils.types import ArgNotSet
 
@@ -18,6 +19,9 @@ from dag_converter.taskflow_parser import TaskFlowAnalyzer
 # Constructor arguments that describe the Dag structure rather than the task. Dag context managers inject
 # these into every operator, and DagFactory rebuilds them from the YAML
 STRUCTURAL_TASK_PARAMETERS = {"dag", "task_group"}
+
+# DecoratedOperator internals that the decorator sets itself
+DECORATOR_INTERNAL_PARAMETERS = {"kwargs_to_upstream"}
 
 
 def convert_tasks(
@@ -60,22 +64,23 @@ def convert_tasks(
 
         # Edge case for DTM, since it stores the actual operator module in '_task_module' instead
         if isinstance(task, MappedOperator):
-            if task.operator_class is _PythonDecoratedOperator:
-                raise InvalidOperatorError("Operator PythonDecoratedOperator is not supported")
-
+            operator_class = task.operator_class
             full_operator_name = f"{task._task_module}.{task.task_type}"
         else:
+            operator_class = type(task)
             full_operator_name = f"{task.__module__}.{task.task_type}"
+
+        # TaskFlow tasks (@task, @task.branch, ...) are converted to DagFactory 'decorator' tasks
+        decorator_import_path = None
+        if isinstance(operator_class, type) and issubclass(operator_class, DecoratedOperator):
+            decorator_import_path = get_decorator_import_path(operator_class)
+            if not decorator_import_path:
+                raise InvalidOperatorError(f"Decorator for {task.task_type} is not supported")
 
         tasks[task_id] = {"operator": full_operator_name}
         valid_task_parameters = get_operator_parameters(full_operator_name)
-
-        # Handle TaskFlow
-        if isinstance(task, _PythonDecoratedOperator):
-            raise InvalidOperatorError("Operator PythonDecoratedOperator is not supported")
-            # Convert any python callables into <file_name>.<function_name> format for easier parsing
-            tasks[task_id] = get_cleanup_dag(tasks[task_id])
-            handle_python_decorator(tasks[task_id], taskflow_parser)
+        if decorator_import_path:
+            valid_task_parameters = [p for p in valid_task_parameters if p not in DECORATOR_INTERNAL_PARAMETERS]
 
         # Only read attributes that map to constructor parameters. Reading every attribute in dir(task)
         # evaluates lazy properties (e.g. SQL operator hooks) that open connections to external systems
@@ -92,6 +97,9 @@ def convert_tasks(
                     key in ["op_kwargs_expand_input", "expand_input", "partial_kwargs", "map_index_template"]
                     or value is None
                     or isinstance(value, ArgNotSet)
+                    # Operators may convert defaults into enums in __init__ (e.g. SqlToS3Operator.file_format),
+                    # which they do not accept back as input. Unless the user passed them they are only defaults
+                    or (isinstance(value, Enum) and not isinstance(value, str) and key not in init_kwargs)
                 ):
                     pass
                 # Skip params only if they match DAG params AND were not explicitly set
@@ -157,7 +165,41 @@ def convert_tasks(
             if "failure_states" in tasks[task_id]:
                 del tasks[task_id]["failure_states"]
 
+        if decorator_import_path:
+            # Convert python callables and XComArgs to strings before restructuring the call arguments
+            tasks[task_id] = get_cleanup_dag(tasks[task_id])
+            handle_python_decorator(tasks[task_id], decorator_import_path, get_callable_parameter_names(task))
+
     return tasks
+
+
+def get_decorator_import_path(operator_class: type) -> str | None:
+    """
+    Returns the import path of the decorator that creates 'operator_class'.
+
+    Decorators live in the same module as their operator, e.g. '_BranchPythonDecoratedOperator' and
+    'branch_task' (@task.branch) in airflow.providers.standard.decorators.branch_python.
+    """
+    module = importlib.import_module(operator_class.__module__)
+    for name, obj in vars(module).items():
+        if (
+            inspect.isfunction(obj)
+            and obj.__module__ == module.__name__
+            and name.endswith("_task")
+            and not name.startswith("_")
+        ):
+            return f"{module.__name__}.{name}"
+    return None
+
+
+def get_callable_parameter_names(task: Operator) -> list[str]:
+    """Returns the parameter names of a TaskFlow task's python callable, in positional order"""
+    python_callable = getattr(task, "python_callable", None)
+    if python_callable is None and isinstance(task, MappedOperator):
+        python_callable = task.partial_kwargs.get("python_callable")
+    if python_callable is None:
+        return []
+    return list(inspect.signature(python_callable).parameters)
 
 
 def get_operator_parameters(operator_class_or_string: type[Operator] | str) -> list[str]:

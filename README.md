@@ -37,6 +37,11 @@ Review the converted Dags in the `output_yaml` folder in the current directory
 * `--validate/--no-validate`: Validate the output YAML using DagFactory
 * `--debug/--no-debug` Enable logging DagBag objects to .initial_task_attributes before and after conversion
 
+## TaskFlow Dags
+Tasks created with TaskFlow decorators (`@task`, `@task.branch`, `@task.short_circuit`, `@task.bash`, ...) are converted to `dag-factory` decorator tasks.
+In a TaskFlow Dag file the functions are wrapped by the decorator, and `dag-factory` needs the plain functions, so the converter also writes a `<dag_id>_taskflow.py` module next to the YAML that exposes them.
+Deploy it together with the YAML and the original Python Dag file, which it imports. With `--bucket` it is uploaded together with the YAML.
+
 ## Limitations
 * Operators outside the verified list in `validator_schema.yaml` are converted with a warning. Their provider packages must be installed where the converter runs
 * Behavior that is not supported in `dag-factory` will not be converted

@@ -5,6 +5,7 @@ import boto3
 from dag_converter.cleanup import get_cleanup_dag
 from dag_converter.console_config import print_error, print_info, print_progress, print_success
 from dag_converter.conversion.converter import get_converted_format
+from dag_converter.conversion.taskflow_module import build_taskflow_module
 from dag_converter.dagbag import get_dag_object
 from dag_converter.schema_parser import ArgumentValidator
 from dag_converter.static_validator import validate_file
@@ -99,6 +100,9 @@ class ConversionManager:
             taskflow_parser = TaskFlowAnalyzer(dag_file_path)
             dag_formatted = get_converted_format(taskflow_parser, dag_object, dag_file_path, validator)
             dag_cleaned = get_cleanup_dag(dag_formatted)
+            # TaskFlow tasks need a companion module exposing their undecorated functions
+            dag_key = next(iter(dag_cleaned.keys()))
+            taskflow_module = build_taskflow_module(dag_key, dag_cleaned[dag_key].get("tasks") or {})
             dag_yaml = build_yaml(dag_cleaned)
 
             # Validation with Dag Factory
@@ -110,12 +114,15 @@ class ConversionManager:
                 old_dag_id = next(iter(dag_cleaned.keys()))
                 renamed_dict = {TEMPORARY_DAG_ID: dag_cleaned[old_dag_id]}
 
-                is_valid, message = validate_yaml_with_dagbag(dag_object, build_yaml(renamed_dict), dag_file_path)
+                is_valid, message = validate_yaml_with_dagbag(
+                    dag_object, build_yaml(renamed_dict), dag_file_path, taskflow_module
+                )
                 if not is_valid:
                     print_error(f"YAML validation failed: {message}")
                     with open(output_path, "w") as f:
                         f.write(str(dag_yaml))
                     print_info(f"YAML written to {output_path} despite validation failure")
+                    self._write_taskflow_module(taskflow_module, output_dir)
                     raise Exception(f"Validation failed: {message}")
                 else:
                     print_success("YAML validation successful, no errors found")
@@ -126,9 +133,12 @@ class ConversionManager:
                     with open(output_path, "w") as f:
                         f.write(str(dag_yaml))
                     print_success(f"YAML written to {output_path}")
+                taskflow_module_path = self._write_taskflow_module(taskflow_module, output_dir)
 
                 if self.s3_bucket:
                     self._upload_to_s3(output_path.name, output_path)
+                    if taskflow_module_path:
+                        self._upload_to_s3(taskflow_module_path.name, taskflow_module_path)
 
             print_info("\n\n----------------------------------------------------------------------------------\n\n")
             result_output_yaml.append(dag_yaml)
@@ -139,6 +149,17 @@ class ConversionManager:
             )
 
         return result_output_yaml
+
+    def _write_taskflow_module(self, taskflow_module: tuple[str, str] | None, output_dir: Path) -> Path | None:
+        """Write the companion module of TaskFlow tasks next to the YAML. It must be deployed with the YAML"""
+        if not taskflow_module:
+            return None
+        module_name, module_source = taskflow_module
+        module_path = output_dir / f"{module_name}.py"
+        with open(module_path, "w") as f:
+            f.write(module_source)
+        print_success(f"TaskFlow module written to {module_path}. Deploy it together with the YAML")
+        return module_path
 
     def _upload_to_s3(self, dag_file_name: str, output_path: Path):
         """

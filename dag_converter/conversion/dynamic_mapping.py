@@ -57,7 +57,7 @@ def reformat(expand_dict: dict | list | tuple, task_types: dict[str, str]):
             task_id_match = re.search(r"task_ids=['\"]([^'\"]*)['\"]", v)
             task_id = str(task_id_match.group(1) if task_id_match else None)
 
-            if task_types[task_id] == "_PythonDecoratedOperator":
+            if task_types[task_id].endswith("DecoratedOperator"):
                 expand_dict[k] = f"+{task_id}"
             else:
                 expand_dict[k] = f"{task_id}.output"
