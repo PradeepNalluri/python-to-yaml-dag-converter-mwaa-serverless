@@ -39,8 +39,12 @@ Review the converted Dags in the `output_yaml` folder in the current directory
 
 ## TaskFlow Dags
 Tasks created with TaskFlow decorators (`@task`, `@task.branch`, `@task.short_circuit`, `@task.bash`, ...) are converted to `dag-factory` decorator tasks.
-In a TaskFlow Dag file the functions are wrapped by the decorator, and `dag-factory` needs the plain functions, so the converter also writes a `<dag_id>_taskflow.py` module next to the YAML that exposes them.
-Deploy it together with the YAML and the original Python Dag file, which it imports. With `--bucket` it is uploaded together with the YAML.
+`dag-factory` needs plain, importable functions, so the converter also writes a `<dag_id>_taskflow.py` module next to the YAML. It holds a copy of the TaskFlow functions defined in the Dag file, including functions defined inside the `@dag` function, together with the imports, helper functions, classes and constants they use. Functions imported from other modules are imported from there.
+Deploy the module together with the YAML. With `--bucket` it is uploaded together with the YAML.
+
+Not supported:
+* TaskFlow functions that use module-level objects other than imports, functions, classes and constants (e.g. a client created at import time), or variables of the `@dag` function that are not constants
+* TaskFlow arguments that take the output of a classic operator (`my_task(operator.output)`), which `dag-factory` decorator tasks cannot express
 
 ## Limitations
 * Operators outside the verified list in `validator_schema.yaml` are converted with a warning. Their provider packages must be installed where the converter runs

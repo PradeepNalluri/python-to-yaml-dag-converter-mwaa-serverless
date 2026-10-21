@@ -100,9 +100,9 @@ class ConversionManager:
             taskflow_parser = TaskFlowAnalyzer(dag_file_path)
             dag_formatted = get_converted_format(taskflow_parser, dag_object, dag_file_path, validator)
             dag_cleaned = get_cleanup_dag(dag_formatted)
-            # TaskFlow tasks need a companion module exposing their undecorated functions
+            # TaskFlow tasks need a companion module holding their plain functions
             dag_key = next(iter(dag_cleaned.keys()))
-            taskflow_module = build_taskflow_module(dag_key, dag_cleaned[dag_key].get("tasks") or {})
+            taskflow_module = build_taskflow_module(dag_object, dag_file_path, dag_cleaned[dag_key].get("tasks") or {})
             dag_yaml = build_yaml(dag_cleaned)
 
             # Validation with Dag Factory

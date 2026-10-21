@@ -51,6 +51,8 @@ def convert_tasks(
 
         task_types[task_id] = task.task_type
 
+    operator_task_ids = {task.task_id for task in dag_object.tasks if not is_decorated_task(task)}
+
     # Second iteration through tasks to handle the actual conversion
     for task in dag_object.tasks:
         task_id = task.task_id
@@ -72,7 +74,7 @@ def convert_tasks(
 
         # TaskFlow tasks (@task, @task.branch, ...) are converted to DagFactory 'decorator' tasks
         decorator_import_path = None
-        if isinstance(operator_class, type) and issubclass(operator_class, DecoratedOperator):
+        if is_decorated_task(task):
             decorator_import_path = get_decorator_import_path(operator_class)
             if not decorator_import_path:
                 raise InvalidOperatorError(f"Decorator for {task.task_type} is not supported")
@@ -168,9 +170,17 @@ def convert_tasks(
         if decorator_import_path:
             # Convert python callables and XComArgs to strings before restructuring the call arguments
             tasks[task_id] = get_cleanup_dag(tasks[task_id])
-            handle_python_decorator(tasks[task_id], decorator_import_path, get_callable_parameter_names(task))
+            handle_python_decorator(
+                tasks[task_id], decorator_import_path, get_callable_parameter_names(task), operator_task_ids
+            )
 
     return tasks
+
+
+def is_decorated_task(task: Operator) -> bool:
+    """Whether the task was created by a TaskFlow decorator"""
+    operator_class = task.operator_class if isinstance(task, MappedOperator) else type(task)
+    return isinstance(operator_class, type) and issubclass(operator_class, DecoratedOperator)
 
 
 def get_decorator_import_path(operator_class: type) -> str | None:
@@ -192,11 +202,17 @@ def get_decorator_import_path(operator_class: type) -> str | None:
     return None
 
 
-def get_callable_parameter_names(task: Operator) -> list[str]:
-    """Returns the parameter names of a TaskFlow task's python callable, in positional order"""
+def get_python_callable(task: Operator):
+    """Returns the python callable of a task. Mapped tasks keep it in 'partial_kwargs'"""
     python_callable = getattr(task, "python_callable", None)
     if python_callable is None and isinstance(task, MappedOperator):
         python_callable = task.partial_kwargs.get("python_callable")
+    return python_callable
+
+
+def get_callable_parameter_names(task: Operator) -> list[str]:
+    """Returns the parameter names of a TaskFlow task's python callable, in positional order"""
+    python_callable = get_python_callable(task)
     if python_callable is None:
         return []
     return list(inspect.signature(python_callable).parameters)

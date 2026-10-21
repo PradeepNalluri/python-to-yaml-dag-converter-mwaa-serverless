@@ -10,9 +10,11 @@ from unittest.mock import Mock
 
 import yaml
 from airflow.models.dag import DAG
+from airflow.providers.standard.operators.python import PythonOperator
 from airflow.sdk import task
 
 from dag_converter.cleanup import get_cleanup_dag
+from dag_converter.conversion.exceptions import InvalidOperatorError
 from dag_converter.conversion.tasks import convert_tasks
 from dag_converter.conversion_manager import ConversionManager
 from dag_converter.schema_parser import ArgumentValidator
@@ -98,6 +100,24 @@ class TestTaskflowConversion(unittest.TestCase):
         self.assertEqual(tasks["double"]["decorator"], f"{DECORATORS}.python.python_task")
         self.assertEqual(tasks["double"]["expand"], {"number": "+extract"})
 
+    def test_operator_output_argument_is_unsupported(self):
+        """DagFactory would pass the operator itself instead of its output"""
+        with DAG(dag_id="test_dag", start_date=datetime(2026, 1, 1), schedule=None) as dag:
+            numbers = PythonOperator(task_id="numbers", python_callable=list)
+            double(numbers.output)
+
+        with self.assertRaises(InvalidOperatorError) as context:
+            self._convert(dag)
+        self.assertIn("operator task 'numbers'", str(context.exception))
+
+    def test_mapping_over_operator_output_is_unsupported(self):
+        with DAG(dag_id="test_dag", start_date=datetime(2026, 1, 1), schedule=None) as dag:
+            numbers = PythonOperator(task_id="numbers", python_callable=list)
+            double.expand(number=numbers.output)
+
+        with self.assertRaises(InvalidOperatorError):
+            self._convert(dag)
+
 
 class TestTaskflowConversionEndToEnd(unittest.TestCase):
     """Converts a TaskFlow Dag file and validates the output with DagFactory"""
@@ -149,7 +169,9 @@ class TestTaskflowConversionEndToEnd(unittest.TestCase):
         self.assertEqual(converted["add"]["number"], "+get_number")
         self.assertEqual(converted["add"]["amount"], 2)
         module_source = (self.output_dir / "e2e_taskflow_taskflow.py").read_text()
-        self.assertIn("add = _undecorated(e2e_taskflow_dag.add)", module_source)
+        self.assertIn("def add(number, amount):", module_source)
+        # The Dag file is not imported, which would create the original Dag next to the converted one
+        self.assertNotIn("e2e_taskflow_dag", module_source)
 
 
 if __name__ == "__main__":
