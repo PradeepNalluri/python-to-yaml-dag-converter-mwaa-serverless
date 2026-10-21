@@ -1,0 +1,93 @@
+example_salesforce_to_s3:
+  dag_id: example_salesforce_to_s3
+  params: {}
+  default_args:
+    start_date:
+      __type__: datetime.datetime
+      year: 2026
+      month: 1
+      day: 1
+  schedule: '@once'
+  tasks:
+    create_s3_bucket:
+      operator: airflow.providers.amazon.aws.operators.s3.S3CreateBucketOperator
+      aws_conn_id: aws_default
+      bucket_name: test-salesforce-to-s3-bucket
+      outlets: []
+      priority_weight: 1
+      retries: 0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
+      retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
+      task_id: create_s3_bucket
+      trigger_rule: all_success
+      wait_for_downstream: false
+      dependencies: []
+    upload_salesforce_to_s3:
+      operator: airflow.providers.amazon.aws.transfers.salesforce_to_s3.SalesforceToS3Operator
+      aws_conn_id: aws_default
+      coerce_to_timestamp: false
+      encrypt: false
+      export_format: csv
+      gzip: false
+      include_deleted: false
+      outlets: []
+      priority_weight: 1
+      record_time_added: false
+      replace: true
+      retries: 0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
+      retry_exponential_backoff: false
+      s3_bucket_name: test-salesforce-to-s3-bucket
+      s3_key: test-salesforce-to-s3-key
+      salesforce_conn_id: salesforce
+      salesforce_query: SELECT AccountNumber, Name FROM Account
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
+      task_id: upload_salesforce_to_s3
+      trigger_rule: all_success
+      wait_for_downstream: false
+      dependencies:
+      - create_s3_bucket
+    delete_s3_bucket:
+      operator: airflow.providers.amazon.aws.operators.s3.S3DeleteBucketOperator
+      aws_conn_id: aws_default
+      bucket_name: test-salesforce-to-s3-bucket
+      force_delete: true
+      outlets: []
+      priority_weight: 1
+      retries: 0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
+      retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
+      task_id: delete_s3_bucket
+      trigger_rule: all_done
+      wait_for_downstream: false
+      dependencies:
+      - upload_salesforce_to_s3
+  catchup: false
+  dag_display_name: example_salesforce_to_s3
+  owner_links: {}
+  start_date:
+    __type__: datetime.datetime
+    year: 2026
+    month: 1
+    day: 1
+  tags: []

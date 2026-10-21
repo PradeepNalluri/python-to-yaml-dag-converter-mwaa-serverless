@@ -1,0 +1,87 @@
+example_s3_to_ftp:
+  dag_id: example_s3_to_ftp
+  params: {}
+  default_args:
+    start_date:
+      __type__: datetime.datetime
+      year: 2026
+      month: 1
+      day: 1
+  schedule: '@once'
+  tasks:
+    create_s3_bucket:
+      operator: airflow.providers.amazon.aws.operators.s3.S3CreateBucketOperator
+      aws_conn_id: aws_default
+      bucket_name: test-s3-to-ftp-bucket
+      outlets: []
+      priority_weight: 1
+      retries: 0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
+      retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
+      task_id: create_s3_bucket
+      trigger_rule: all_success
+      wait_for_downstream: false
+      dependencies: []
+    ftp_to_s3_task:
+      operator: airflow.providers.amazon.aws.transfers.s3_to_ftp.S3ToFTPOperator
+      aws_conn_id: aws_default
+      fail_on_file_not_exist: true
+      ftp_conn_id: ftp_default
+      ftp_path: /tmp/ftp_path
+      outlets: []
+      priority_weight: 1
+      retries: 0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
+      retry_exponential_backoff: false
+      s3_bucket: test-s3-to-ftp-bucket
+      s3_key: test-s3-to-ftp-key
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
+      task_id: ftp_to_s3_task
+      trigger_rule: all_success
+      wait_for_downstream: false
+      dependencies:
+      - create_s3_bucket
+    delete_s3_bucket:
+      operator: airflow.providers.amazon.aws.operators.s3.S3DeleteBucketOperator
+      aws_conn_id: aws_default
+      bucket_name: test-s3-to-ftp-bucket
+      force_delete: true
+      outlets: []
+      priority_weight: 1
+      retries: 0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
+      retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
+      task_id: delete_s3_bucket
+      trigger_rule: all_done
+      wait_for_downstream: false
+      dependencies:
+      - ftp_to_s3_task
+  catchup: false
+  dag_display_name: example_s3_to_ftp
+  owner_links: {}
+  start_date:
+    __type__: datetime.datetime
+    year: 2026
+    month: 1
+    day: 1
+  tags: []

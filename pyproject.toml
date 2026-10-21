@@ -62,7 +62,9 @@ path = "dag_converter/__init__.py"
 ## Integ Tests
 [tool.hatch.envs.dev]
 dependencies = [
-    "opensearch-py==3.0.0"
+    "opensearch-py==3.0.0",
+    # Providers required by integ test Dags that use AWS transfer operators to and from other systems
+    "apache-airflow-providers-amazon[apache-hive,ftp,google,imap,microsoft-azure,mongo,salesforce,ssh]==9.30.0",
 ]
 
 [tool.hatch.envs.tests]

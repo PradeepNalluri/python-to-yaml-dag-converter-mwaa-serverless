@@ -1,0 +1,93 @@
+example_google_api_sheets_to_s3:
+  dag_id: example_google_api_sheets_to_s3
+  params: {}
+  default_args:
+    start_date:
+      __type__: datetime.datetime
+      year: 2026
+      month: 1
+      day: 1
+  schedule: '@once'
+  tasks:
+    create_s3_bucket:
+      operator: airflow.providers.amazon.aws.operators.s3.S3CreateBucketOperator
+      aws_conn_id: aws_default
+      bucket_name: test-google-api-sheets
+      outlets: []
+      priority_weight: 1
+      retries: 0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
+      retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
+      task_id: create_s3_bucket
+      trigger_rule: all_success
+      wait_for_downstream: false
+      dependencies: []
+    google_sheet_data_to_s3:
+      operator: airflow.providers.amazon.aws.transfers.google_api_to_s3.GoogleApiToS3Operator
+      aws_conn_id: aws_default
+      gcp_conn_id: google_cloud_default
+      google_api_endpoint_params:
+        spreadsheetId: test-google-sheet-id
+        range: test-google-sheet-range
+      google_api_endpoint_path: sheets.spreadsheets.values.get
+      google_api_num_retries: 0
+      google_api_pagination: false
+      google_api_service_name: sheets
+      google_api_service_version: v4
+      outlets: []
+      priority_weight: 1
+      retries: 0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
+      retry_exponential_backoff: false
+      s3_destination_key: s3://test-google-api-sheets/test-google-api-key
+      s3_overwrite: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
+      task_id: google_sheet_data_to_s3
+      trigger_rule: all_success
+      wait_for_downstream: false
+      dependencies:
+      - create_s3_bucket
+    delete_s3_bucket:
+      operator: airflow.providers.amazon.aws.operators.s3.S3DeleteBucketOperator
+      aws_conn_id: aws_default
+      bucket_name: test-google-api-sheets
+      force_delete: true
+      outlets: []
+      priority_weight: 1
+      retries: 0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
+      retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
+      task_id: delete_s3_bucket
+      trigger_rule: all_done
+      wait_for_downstream: false
+      dependencies:
+      - google_sheet_data_to_s3
+  catchup: false
+  dag_display_name: example_google_api_sheets_to_s3
+  owner_links: {}
+  start_date:
+    __type__: datetime.datetime
+    year: 2026
+    month: 1
+    day: 1
+  tags: []

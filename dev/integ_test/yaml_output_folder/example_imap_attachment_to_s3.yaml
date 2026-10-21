@@ -1,0 +1,90 @@
+example_imap_attachment_to_s3:
+  dag_id: example_imap_attachment_to_s3
+  params: {}
+  default_args:
+    start_date:
+      __type__: datetime.datetime
+      year: 2026
+      month: 1
+      day: 1
+  schedule: '@once'
+  tasks:
+    create_s3_bucket:
+      operator: airflow.providers.amazon.aws.operators.s3.S3CreateBucketOperator
+      aws_conn_id: aws_default
+      bucket_name: test-imap-attachment-to-s3-bucket
+      outlets: []
+      priority_weight: 1
+      retries: 0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
+      retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
+      task_id: create_s3_bucket
+      trigger_rule: all_success
+      wait_for_downstream: false
+      dependencies: []
+    transfer_imap_attachment_to_s3:
+      operator: airflow.providers.amazon.aws.transfers.imap_attachment_to_s3.ImapAttachmentToS3Operator
+      aws_conn_id: aws_default
+      imap_attachment_name: test-attachment-name
+      imap_check_regex: false
+      imap_conn_id: imap_default
+      imap_mail_filter: All
+      imap_mail_folder: test-mail-folder
+      outlets: []
+      priority_weight: 1
+      retries: 0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
+      retry_exponential_backoff: false
+      s3_bucket: test-imap-attachment-to-s3-bucket
+      s3_key: test-imap-attachment-to-s3-key
+      s3_overwrite: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
+      task_id: transfer_imap_attachment_to_s3
+      trigger_rule: all_success
+      wait_for_downstream: false
+      dependencies:
+      - create_s3_bucket
+    delete_s3_bucket:
+      operator: airflow.providers.amazon.aws.operators.s3.S3DeleteBucketOperator
+      aws_conn_id: aws_default
+      bucket_name: test-imap-attachment-to-s3-bucket
+      force_delete: true
+      outlets: []
+      priority_weight: 1
+      retries: 0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
+      retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
+      task_id: delete_s3_bucket
+      trigger_rule: all_done
+      wait_for_downstream: false
+      dependencies:
+      - transfer_imap_attachment_to_s3
+  catchup: false
+  dag_display_name: example_imap_attachment_to_s3
+  owner_links: {}
+  start_date:
+    __type__: datetime.datetime
+    year: 2026
+    month: 1
+    day: 1
+  tags: []
