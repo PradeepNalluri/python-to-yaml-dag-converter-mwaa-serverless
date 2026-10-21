@@ -38,7 +38,7 @@ Review the converted Dags in the `output_yaml` folder in the current directory
 * `--debug/--no-debug` Enable logging DagBag objects to .initial_task_attributes before and after conversion
 
 ## Limitations
-* Only AWS operators and AWS provider packages are supported
+* Operators outside the verified list in `validator_schema.yaml` are converted with a warning. Their provider packages must be installed where the converter runs
 * Behavior that is not supported in `dag-factory` will not be converted
 * Dynamic task mapping conversion is not supported
 
