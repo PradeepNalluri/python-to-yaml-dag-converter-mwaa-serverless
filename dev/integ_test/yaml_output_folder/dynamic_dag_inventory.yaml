@@ -98,8 +98,8 @@ dynamic_dag_inventory:
       trigger_rule: all_success
       wait_for_downstream: false
       dependencies:
-      - process_suppliers
       - process_stock
+      - process_suppliers
   catchup: false
   dag_display_name: dynamic_dag_inventory
   description: Dynamically generated DAG for inventory

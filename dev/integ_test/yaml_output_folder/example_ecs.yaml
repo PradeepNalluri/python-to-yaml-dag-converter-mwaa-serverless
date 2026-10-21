@@ -62,10 +62,10 @@ example_ecs:
       failure_states:
       - __type__: airflow.providers.amazon.aws.hooks.ecs.EcsClusterStates
         __args__:
-        - INACTIVE
+        - FAILED
       - __type__: airflow.providers.amazon.aws.hooks.ecs.EcsClusterStates
         __args__:
-        - FAILED
+        - INACTIVE
       mode: poke
       outlets: []
       poke_interval: 60.0
@@ -201,8 +201,8 @@ example_ecs:
       waiter_max_attempts: 1000000
       dependencies:
       - get_region
-      - register_task
       - await_task_definition
+      - register_task
     deregister_task:
       operator: airflow.providers.amazon.aws.operators.ecs.EcsDeregisterTaskDefinitionOperator
       aws_conn_id: aws_default
@@ -224,8 +224,8 @@ example_ecs:
       trigger_rule: all_done
       wait_for_downstream: false
       dependencies:
-      - register_task
       - run_task
+      - register_task
     delete_cluster:
       operator: airflow.providers.amazon.aws.operators.ecs.EcsDeleteClusterOperator
       aws_conn_id: aws_default
@@ -258,10 +258,10 @@ example_ecs:
       failure_states:
       - __type__: airflow.providers.amazon.aws.hooks.ecs.EcsClusterStates
         __args__:
-        - INACTIVE
+        - FAILED
       - __type__: airflow.providers.amazon.aws.hooks.ecs.EcsClusterStates
         __args__:
-        - FAILED
+        - INACTIVE
       mode: poke
       outlets: []
       poke_interval: 60.0

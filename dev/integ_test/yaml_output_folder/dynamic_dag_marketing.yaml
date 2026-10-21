@@ -98,8 +98,8 @@ dynamic_dag_marketing:
       trigger_rule: all_success
       wait_for_downstream: false
       dependencies:
-      - process_campaigns
       - process_analytics
+      - process_campaigns
   catchup: false
   dag_display_name: dynamic_dag_marketing
   description: Dynamically generated DAG for marketing

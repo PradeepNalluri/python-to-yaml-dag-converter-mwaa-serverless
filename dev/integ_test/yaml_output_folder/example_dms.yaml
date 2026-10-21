@@ -238,8 +238,8 @@ example_dms:
       wait_for_downstream: false
       do_xcom_push: false
       dependencies:
-      - create_dms_assets
       - start_task
+      - create_dms_assets
     await_task_start:
       operator: airflow.providers.amazon.aws.sensors.dms.DmsTaskBaseSensor
       aws_conn_id: aws_default
@@ -293,8 +293,8 @@ example_dms:
       trigger_rule: all_success
       wait_for_downstream: false
       dependencies:
-      - create_task
       - await_task_start
+      - create_task
     await_task_stop:
       operator: airflow.providers.amazon.aws.sensors.dms.DmsTaskCompletedSensor
       aws_conn_id: aws_default
@@ -375,8 +375,8 @@ example_dms:
       wait_for_downstream: false
       multiple_outputs: false
       dependencies:
-      - create_dms_assets
       - delete_task
+      - create_dms_assets
       replication_instance_arn: "{{ task_instance.xcom_pull(task_ids='create_dms_assets',\
         \ key='replication_instance_arn') }}"
       source_endpoint_arn: "{{ task_instance.xcom_pull(task_ids='create_dms_assets',\

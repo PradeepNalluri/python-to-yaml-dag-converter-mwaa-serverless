@@ -124,8 +124,8 @@ example_quicksight:
       wait_for_downstream: false
       multiple_outputs: false
       dependencies:
-      - get_aws_account_id
       - upload_sample_data
+      - get_aws_account_id
       aws_account_id: +get_aws_account_id
       datasource_name: test-data-source
       bucket: test-quicksight-bucket
@@ -150,8 +150,8 @@ example_quicksight:
       wait_for_downstream: false
       multiple_outputs: false
       dependencies:
-      - get_aws_account_id
       - create_quicksight_data_source
+      - get_aws_account_id
       aws_account_id: +get_aws_account_id
       dataset_name: test-data-set
       data_source_arn: +create_quicksight_data_source
@@ -247,8 +247,8 @@ example_quicksight:
       wait_for_downstream: false
       multiple_outputs: false
       dependencies:
-      - get_aws_account_id
       - await_job
+      - get_aws_account_id
       aws_account_id: +get_aws_account_id
       dataset_name: test-data-set
     delete_quicksight_data_source:
@@ -295,8 +295,8 @@ example_quicksight:
       wait_for_downstream: false
       multiple_outputs: false
       dependencies:
-      - get_aws_account_id
       - delete_quicksight_data_source
+      - get_aws_account_id
       aws_account_id: +get_aws_account_id
       dataset_name: test-data-set
       ingestion_name: test-ingestion

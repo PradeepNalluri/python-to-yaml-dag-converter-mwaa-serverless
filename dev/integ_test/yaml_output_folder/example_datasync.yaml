@@ -337,8 +337,8 @@ example_datasync:
       wait_for_downstream: false
       multiple_outputs: false
       dependencies:
-      - create_task
       - create_and_execute_task
+      - create_task
       task_arn: +create_task
     delete_task_created_by_operator:
       decorator: airflow.providers.standard.decorators.python.python_task

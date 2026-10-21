@@ -7,7 +7,7 @@ example_sagemaker_unified_studio_notebook:
     notebook-task:
       operator: airflow.providers.amazon.aws.operators.sagemaker_unified_studio_notebook.SageMakerUnifiedStudioNotebookOperator
       aws_conn_id: aws_datazone_notebook
-      client_token: idempotency-token-1786668668
+      client_token: idempotency-token-1792593003
       compute_configuration:
         instanceType: sc.m5.large
       deferrable: false

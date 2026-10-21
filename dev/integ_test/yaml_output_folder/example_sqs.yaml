@@ -110,8 +110,8 @@ example_sqs:
       wait_for_downstream: false
       wait_time_seconds: 1
       dependencies:
-      - create_queue
       - publish_to_queue_1
+      - create_queue
     read_from_queue_in_batch:
       operator: airflow.providers.amazon.aws.sensors.sqs.SqsSensor
       aws_conn_id: aws_default
@@ -163,8 +163,8 @@ example_sqs:
       wait_for_downstream: false
       multiple_outputs: false
       dependencies:
-      - read_from_queue_in_batch
       - create_queue
+      - read_from_queue_in_batch
       queue_url: +create_queue
   catchup: false
   dag_display_name: example_sqs

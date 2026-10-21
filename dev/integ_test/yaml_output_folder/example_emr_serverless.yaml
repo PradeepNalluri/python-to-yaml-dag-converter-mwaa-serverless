@@ -32,7 +32,7 @@ example_emr_serverless:
     create_emr_serverless_task:
       operator: airflow.providers.amazon.aws.operators.emr.EmrServerlessCreateApplicationOperator
       aws_conn_id: aws_default
-      client_request_token: ab0bbb2f-f4b9-4218-a3b9-b76eaa6f3504
+      client_request_token: cb89b515-8ab6-4498-8241-ec48ab8e0c46
       config:
         name: new_application
       deferrable: false
@@ -89,7 +89,7 @@ example_emr_serverless:
       application_id: "{{ task_instance.xcom_pull(task_ids='create_emr_serverless_task',\
         \ key='return_value') }}"
       aws_conn_id: aws_default
-      client_request_token: 0113334c-05d1-4985-bc63-0447a7f7cd68
+      client_request_token: b666551e-621e-4858-a95a-added14bf5c5
       config: {}
       configuration_overrides:
         monitoringConfiguration:
@@ -148,15 +148,15 @@ example_emr_serverless:
         month: 1
         day: 1
       target_states:
-      - RUNNING
       - SUCCESS
+      - RUNNING
       task_id: wait_for_job
       timeout: 604800.0
       trigger_rule: all_success
       wait_for_downstream: false
       dependencies:
-      - create_emr_serverless_task
       - start_emr_serverless_job
+      - create_emr_serverless_task
     stop_application:
       operator: airflow.providers.amazon.aws.operators.emr.EmrServerlessStopApplicationOperator
       application_id: "{{ task_instance.xcom_pull(task_ids='create_emr_serverless_task',\

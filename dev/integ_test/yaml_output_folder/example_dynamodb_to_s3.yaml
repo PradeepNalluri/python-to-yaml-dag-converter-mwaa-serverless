@@ -308,9 +308,9 @@ example_dynamodb_to_s3:
       trigger_rule: all_success
       wait_for_downstream: false
       dependencies:
+      - get_latest_export_time
       - get_export_time
       - should_run_incremental_export
-      - get_latest_export_time
     should_run_incremental_export:
       decorator: airflow.providers.standard.decorators.short_circuit.short_circuit_task
       ignore_downstream_trigger_rules: true
@@ -332,8 +332,8 @@ example_dynamodb_to_s3:
       wait_for_downstream: false
       multiple_outputs: false
       dependencies:
-      - get_export_time
       - get_latest_export_time
+      - get_export_time
       start_time: +get_export_time
       end_time: +get_latest_export_time
     wait_for_bucket:

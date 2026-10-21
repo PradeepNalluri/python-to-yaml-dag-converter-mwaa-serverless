@@ -127,8 +127,8 @@ example_ec2:
       wait_for_completion: true
       wait_for_downstream: false
       dependencies:
-      - key_name
       - image_id
+      - key_name
     instance_id:
       operator: airflow.providers.standard.operators.python.PythonOperator
       op_args:
@@ -198,8 +198,8 @@ example_ec2:
       trigger_rule: all_success
       wait_for_downstream: false
       dependencies:
-      - stop_instance
       - instance_id
+      - stop_instance
     await_instance:
       operator: airflow.providers.amazon.aws.sensors.ec2.EC2InstanceStateSensor
       aws_conn_id: aws_default

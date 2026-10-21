@@ -139,8 +139,8 @@ example_sagemaker_pipeline:
       verbose: true
       wait_for_downstream: false
       dependencies:
-      - start_pipeline2
       - stop_pipeline1
+      - start_pipeline2
     delete_pipeline:
       decorator: airflow.providers.standard.decorators.python.python_task
       outlets: []

@@ -162,8 +162,8 @@ example_rds_event:
       wait_for_downstream: false
       multiple_outputs: false
       dependencies:
-      - create_sns_topic
       - delete_db_instance
+      - create_sns_topic
       topic_arn: +create_sns_topic
   catchup: false
   dag_display_name: example_rds_event

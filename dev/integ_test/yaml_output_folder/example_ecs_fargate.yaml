@@ -154,8 +154,8 @@ example_ecs_fargate:
       wait_for_downstream: false
       multiple_outputs: false
       dependencies:
-      - register_task_definition
       - await_task_finish
+      - register_task_definition
       task_definition_arn: +register_task_definition
     delete_cluster:
       decorator: airflow.providers.standard.decorators.python.python_task

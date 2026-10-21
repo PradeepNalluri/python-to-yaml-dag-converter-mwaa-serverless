@@ -14,7 +14,7 @@ example_emr_notebook:
       aws_conn_id: aws_default
       cluster_id: test-cluster-id
       editor_id: test-editor-id
-      notebook_execution_name: emr_notebook_e2abcb33-085a-4b55-8c18-9723a65c5260
+      notebook_execution_name: emr_notebook_932dc8f0-eec9-4030-9a2d-bf46e443f4a3
       notebook_instance_security_group_id: ''
       notebook_params: ''
       outlets: []
@@ -92,8 +92,8 @@ example_emr_notebook:
       waiter_delay: 60
       waiter_max_attempts: 25
       dependencies:
-      - start_execution
       - wait_for_execution_start
+      - start_execution
     wait_for_execution_stop:
       operator: airflow.providers.amazon.aws.sensors.emr.EmrNotebookExecutionSensor
       aws_conn_id: aws_default
@@ -122,14 +122,14 @@ example_emr_notebook:
       trigger_rule: all_success
       wait_for_downstream: false
       dependencies:
-      - start_execution
       - stop_execution
+      - start_execution
     finish_execution:
       operator: airflow.providers.amazon.aws.operators.emr.EmrStartNotebookExecutionOperator
       aws_conn_id: aws_default
       cluster_id: test-cluster-id
       editor_id: test-editor-id
-      notebook_execution_name: emr_notebook_41d39262-af0a-4007-80cd-3cf8d9203196
+      notebook_execution_name: emr_notebook_0d424c6b-ecee-44d1-8c6b-fb3e75e25413
       notebook_instance_security_group_id: ''
       notebook_params: ''
       outlets: []

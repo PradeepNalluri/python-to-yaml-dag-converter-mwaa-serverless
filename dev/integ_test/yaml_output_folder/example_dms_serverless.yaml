@@ -223,8 +223,8 @@ example_dms_serverless:
       wait_for_downstream: false
       multiple_outputs: false
       dependencies:
-      - create_dms_assets
       - delete_replication_config
+      - create_dms_assets
       source_endpoint_arn: "{{ task_instance.xcom_pull(task_ids='create_dms_assets',\
         \ key='source_endpoint_arn') }}"
       target_endpoint_arn: "{{ task_instance.xcom_pull(task_ids='create_dms_assets',\
