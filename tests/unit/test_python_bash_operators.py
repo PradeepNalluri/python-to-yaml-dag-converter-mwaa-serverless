@@ -5,7 +5,6 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from dag_converter.conversion.exceptions import InvalidOperatorError
 from dag_converter.schema_parser import ArgumentValidator
 from dag_converter.static_validator import extract_operator_types, validate_file
 
@@ -161,19 +160,17 @@ task2 = BashOperator(task_id="bash_task", bash_command="echo hello")
         finally:
             os.unlink(file_path)
 
-    def test_validate_file_with_unsupported_operator_fails(self):
-        """Test that a file with an unsupported operator still fails."""
+    def test_validate_file_with_unverified_operator_warns(self):
+        """Test that a file with an unverified operator is reported but not rejected."""
         content = """
 from airflow.providers.standard.operators.python import PythonOperator
 
 task1 = PythonOperator(task_id="test", python_callable=lambda: None)
-task2 = CustomUnsupportedOperator(task_id="bad")
+task2 = CustomUnverifiedOperator(task_id="custom")
 """
         file_path = self._create_file(content)
         try:
-            with self.assertRaises(InvalidOperatorError) as context:
-                validate_file(file_path, self.validator)
-            self.assertIn("CustomUnsupportedOperator", str(context.exception))
+            self.assertEqual(validate_file(file_path, self.validator), ["CustomUnverifiedOperator"])
         finally:
             os.unlink(file_path)
 

@@ -1,21 +1,29 @@
 import ast
 from pathlib import Path
 
-from dag_converter.conversion.exceptions import InvalidOperatorError
+from dag_converter.console_config import print_warning
 from dag_converter.schema_parser import ArgumentValidator
 
 
-def validate_file(file_path: Path, validator: ArgumentValidator):
+def validate_file(file_path: Path, validator: ArgumentValidator) -> list[str]:
+    """
+    Warn about operators that are not in the verified operator list of the schema.
+
+    Unverified operators are still converted. The converted YAML is validated by DagFactory afterwards.
+
+    Returns:
+        Sorted list of operator class names that are not verified
+    """
     operators_in_file = extract_operator_types(file_path)
-    allowed_operators = validator.get_allowed_operators()
-    for operator in operators_in_file:
-        valid = False
-        for allowed_operator in allowed_operators:
-            if operator in allowed_operator:
-                valid = True
-                break
-        if not valid:
-            raise InvalidOperatorError(f"Operator {operator} is not supported")
+    verified_operators = validator.get_allowed_operators()
+    unverified = sorted(
+        operator
+        for operator in operators_in_file
+        if not any(operator in verified_operator for verified_operator in verified_operators)
+    )
+    for operator in unverified:
+        print_warning(f"Operator {operator} has not been verified for conversion, converting anyway")
+    return unverified
 
 
 def extract_dag_params(file_path: Path) -> list[str]:
