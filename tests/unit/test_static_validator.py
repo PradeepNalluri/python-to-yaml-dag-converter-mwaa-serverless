@@ -4,11 +4,8 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
-from dag_converter.conversion.exceptions import (
-    InvalidOperatorError,
-)
 from dag_converter.static_validator import (
     extract_dag_params,
     extract_operator_types,
@@ -171,10 +168,10 @@ dag = DAG(dag_id="test_dag")
         finally:
             os.unlink(file_path)
 
-    def test_validate_file_invalid_operator(self):
-        """Test validate_file with invalid operator."""
+    def test_validate_file_unverified_operator(self):
+        """Test validate_file warns about unverified operators instead of rejecting them."""
         content = """
-task = UnsupportedOperator(task_id="test")
+task = UnverifiedOperator(task_id="test")
 """
         file_path = self._create_file(content)
 
@@ -182,9 +179,10 @@ task = UnsupportedOperator(task_id="test")
         mock_validator.get_allowed_operators.return_value = ["PythonOperator", "BashOperator"]
 
         try:
-            with self.assertRaises(InvalidOperatorError) as context:
-                validate_file(file_path, mock_validator)
-            self.assertIn("UnsupportedOperator is not supported", str(context.exception))
+            with patch("dag_converter.static_validator.print_warning") as mock_warning:
+                unverified = validate_file(file_path, mock_validator)
+            self.assertEqual(unverified, ["UnverifiedOperator"])
+            self.assertIn("UnverifiedOperator", mock_warning.call_args[0][0])
         finally:
             os.unlink(file_path)
 

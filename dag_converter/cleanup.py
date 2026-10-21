@@ -35,6 +35,11 @@ def get_cleanup_dag(obj: Any) -> Any:
         print("xcom arg:" + str(obj))
         return re.sub(pattern, "", obj)
 
+    # String-valued enums (e.g. OnFinishAction) are accepted by operators as their plain value.
+    # str() would render them as "ClassName.MEMBER"
+    if isinstance(obj, str) and isinstance(obj, Enum):
+        return obj.value
+
     if isinstance(obj, str):
         return str(obj)
 
