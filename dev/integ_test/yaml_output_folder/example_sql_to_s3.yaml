@@ -2,7 +2,11 @@ example_sql_to_s3:
   dag_id: example_sql_to_s3
   params: {}
   default_args:
-    start_date: '2026-01-01'
+    start_date:
+      __type__: datetime.datetime
+      year: 2026
+      month: 1
+      day: 1
   schedule: '@once'
   tasks:
     create_bucket:
@@ -10,11 +14,17 @@ example_sql_to_s3:
       aws_conn_id: aws_default
       bucket_name: test-s3-bucket
       outlets: []
-      params: {}
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: create_bucket
       trigger_rule: all_success
       wait_for_downstream: false
@@ -38,20 +48,28 @@ example_sql_to_s3:
       node_type: dc2.large
       number_of_nodes: 1
       outlets: []
-      params: {}
       poll_interval: 60
       port: 5439
       priority_weight: 1
       publicly_accessible: true
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: create_cluster
       trigger_rule: all_success
-      vpc_security_group_ids: [test-security-group]
+      vpc_security_group_ids:
+      - test-security-group
       wait_for_completion: false
       wait_for_downstream: false
-      dependencies: [create_bucket]
+      dependencies:
+      - create_bucket
     wait_cluster_available:
       operator: airflow.providers.amazon.aws.sensors.redshift_cluster.RedshiftClusterSensor
       aws_conn_id: aws_default
@@ -59,31 +77,46 @@ example_sql_to_s3:
       deferrable: false
       mode: poke
       outlets: []
-      params: {}
       poke_interval: 15
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       target_status: available
       task_id: wait_cluster_available
       timeout: 1800
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [create_cluster]
+      dependencies:
+      - create_cluster
     create_connection:
+      decorator: airflow.providers.standard.decorators.python.python_task
       outlets: []
-      params: {}
       priority_weight: 1
-      python_callable: airflow_sql_to_s3.create_connection
+      python_callable: example_sql_to_s3_taskflow.create_connection
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: create_connection
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [wait_cluster_available]
-      decorator: airflow.decorators.task
+      multiple_outputs: false
+      dependencies:
+      - wait_cluster_available
       conn_id_name: test-conn-id
       cluster_id: test-redshift-cluster
     create_table_redshift_data:
@@ -94,11 +127,12 @@ example_sql_to_s3:
       db_user: adminuser
       deferrable: false
       outlets: []
-      params: {}
       poll_interval: 10
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
       return_sql_result: false
       sql: |2
@@ -108,12 +142,18 @@ example_sql_to_s3:
             name VARCHAR NOT NULL,
             color VARCHAR NOT NULL
             );
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: create_table_redshift_data
       trigger_rule: all_success
       wait_for_completion: true
       wait_for_downstream: false
       with_event: false
-      dependencies: [create_connection]
+      dependencies:
+      - create_connection
     insert_data:
       operator: airflow.providers.amazon.aws.operators.redshift_data.RedshiftDataOperator
       aws_conn_id: aws_default
@@ -122,80 +162,104 @@ example_sql_to_s3:
       db_user: adminuser
       deferrable: false
       outlets: []
-      params: {}
       poll_interval: 10
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
       return_sql_result: false
-      sql: INSERT INTO test_table VALUES ( 1, 'Banana', 'Yellow');
+      sql: "INSERT INTO test_table VALUES ( 1, 'Banana', 'Yellow');"
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: insert_data
       trigger_rule: all_success
       wait_for_completion: true
       wait_for_downstream: false
       with_event: false
-      dependencies: [create_table_redshift_data]
+      dependencies:
+      - create_table_redshift_data
     sql_to_s3_task:
       operator: airflow.providers.amazon.aws.transfers.sql_to_s3.SqlToS3Operator
       aws_conn_id: aws_default
-      file_format: CSV
       groupby_kwargs: {}
       max_rows_per_file: 0
       outlets: []
-      params: {}
-      pd_kwargs: {}
       priority_weight: 1
       query: SELECT * FROM test_table
       replace: true
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
       s3_bucket: test-s3-bucket
       s3_key: test-key
       sql_conn_id: test-conn-id
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: sql_to_s3_task
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [insert_data]
+      dependencies:
+      - insert_data
     sql_to_s3_with_groupby_task:
       operator: airflow.providers.amazon.aws.transfers.sql_to_s3.SqlToS3Operator
       aws_conn_id: aws_default
-      file_format: CSV
       groupby_kwargs:
         by: color
       max_rows_per_file: 0
       outlets: []
-      params: {}
-      pd_kwargs: {}
       priority_weight: 1
       query: SELECT * FROM test_table
       replace: true
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
       s3_bucket: test-s3-bucket
       s3_key: test-key
       sql_conn_id: test-conn-id
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: sql_to_s3_with_groupby_task
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [sql_to_s3_task]
+      dependencies:
+      - sql_to_s3_task
     delete_bucket:
       operator: airflow.providers.amazon.aws.operators.s3.S3DeleteBucketOperator
       aws_conn_id: aws_default
       bucket_name: test-s3-bucket
       force_delete: true
       outlets: []
-      params: {}
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: delete_bucket
       trigger_rule: all_done
       wait_for_downstream: false
-      dependencies: [sql_to_s3_with_groupby_task]
+      dependencies:
+      - sql_to_s3_with_groupby_task
     delete_cluster:
       operator: airflow.providers.amazon.aws.operators.redshift_cluster.RedshiftDeleteClusterOperator
       aws_conn_id: aws_default
@@ -203,15 +267,31 @@ example_sql_to_s3:
       deferrable: false
       max_attempts: 30
       outlets: []
-      params: {}
       poll_interval: 30
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
       skip_final_cluster_snapshot: true
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: delete_cluster
       trigger_rule: all_done
       wait_for_completion: true
       wait_for_downstream: false
-      dependencies: [delete_bucket]
+      dependencies:
+      - delete_bucket
+  catchup: false
+  dag_display_name: example_sql_to_s3
+  owner_links: {}
+  start_date:
+    __type__: datetime.datetime
+    year: 2026
+    month: 1
+    day: 1
+  tags: []

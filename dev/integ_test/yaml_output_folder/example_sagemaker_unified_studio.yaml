@@ -2,22 +2,33 @@ example_sagemaker_unified_studio:
   dag_id: example_sagemaker_unified_studio
   params: {}
   default_args:
-    start_date: '2026-01-01'
+    start_date:
+      __type__: datetime.datetime
+      year: 2026
+      month: 1
+      day: 1
   schedule: '@once'
   tasks:
     mock_mwaa_environment:
+      decorator: airflow.providers.standard.decorators.python.python_task
       outlets: []
-      params: {}
       priority_weight: 1
-      python_callable: airflow_sagemaker_unified_studio.mock_mwaa_environment
+      python_callable: example_sagemaker_unified_studio_taskflow.mock_mwaa_environment
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: mock_mwaa_environment
       trigger_rule: all_success
       wait_for_downstream: false
+      multiple_outputs: false
       dependencies: []
-      decorator: airflow.decorators.task
       parameters:
         AIRFLOW__WORKFLOWS__DATAZONE_DOMAIN_ID: test-domain-id
         AIRFLOW__WORKFLOWS__DATAZONE_PROJECT_ID: test-project-id
@@ -38,12 +49,19 @@ example_sagemaker_unified_studio:
         input_params: {}
       outlets: []
       output_config:
-        output_formats: [NOTEBOOK]
-      params: {}
+        output_formats:
+        - NOTEBOOK
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       tags: {}
       task_id: run-notebook
       termination_condition:
@@ -53,4 +71,26 @@ example_sagemaker_unified_studio:
       wait_for_downstream: false
       waiter_delay: 5
       waiter_max_attempts: 1440
-      dependencies: [mock_mwaa_environment]
+      executor_config:
+        overrides:
+          containerOverrides:
+            environment:
+              AIRFLOW__WORKFLOWS__DATAZONE_DOMAIN_ID: test-domain-id
+              AIRFLOW__WORKFLOWS__DATAZONE_PROJECT_ID: test-project-id
+              AIRFLOW__WORKFLOWS__DATAZONE_ENVIRONMENT_ID: test-environment-id
+              AIRFLOW__WORKFLOWS__DATAZONE_SCOPE_NAME: dev
+              AIRFLOW__WORKFLOWS__DATAZONE_STAGE: prod
+              AIRFLOW__WORKFLOWS__DATAZONE_ENDPOINT: https://datazone.us-east-1.api.aws
+              AIRFLOW__WORKFLOWS__PROJECT_S3_PATH: test-s3-path
+              AIRFLOW__WORKFLOWS__DATAZONE_DOMAIN_REGION: us-east-1
+      dependencies:
+      - mock_mwaa_environment
+  catchup: false
+  dag_display_name: example_sagemaker_unified_studio
+  owner_links: {}
+  start_date:
+    __type__: datetime.datetime
+    year: 2026
+    month: 1
+    day: 1
+  tags: []

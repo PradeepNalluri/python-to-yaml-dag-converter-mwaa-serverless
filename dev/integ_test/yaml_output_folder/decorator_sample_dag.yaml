@@ -3,64 +3,109 @@ decorator_sample_dag:
   params: {}
   default_args:
     owner: airflow
-    start_date: '2026-01-01'
+    start_date:
+      __type__: datetime.datetime
+      year: 2026
+      month: 1
+      day: 1
     retries: 1
-    retry_delay: 300.0
-  schedule: 0 0 * * ? *
+    retry_delay:
+      __type__: datetime.timedelta
+      seconds: 300.0
+  schedule: '@daily'
   tasks:
     get_random_number:
+      decorator: airflow.providers.standard.decorators.python.python_task
       outlets: []
-      params: {}
       priority_weight: 1
-      python_callable: simple_taskflow.get_random_number
+      python_callable: decorator_sample_dag_taskflow.get_random_number
       retries: 1
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: get_random_number
       trigger_rule: all_success
       wait_for_downstream: false
+      multiple_outputs: false
       dependencies: []
-      decorator: airflow.decorators.task
     double_number:
+      decorator: airflow.providers.standard.decorators.python.python_task
       outlets: []
-      params: {}
       priority_weight: 1
-      python_callable: simple_taskflow.double_number
+      python_callable: decorator_sample_dag_taskflow.double_number
       retries: 1
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: double_number
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [get_random_number]
-      decorator: airflow.decorators.task
+      multiple_outputs: false
+      dependencies:
+      - get_random_number
       number12321: +get_random_number
     get_numbers_list:
+      decorator: airflow.providers.standard.decorators.python.python_task
       outlets: []
-      params: {}
       priority_weight: 1
-      python_callable: simple_taskflow.get_numbers_list
+      python_callable: decorator_sample_dag_taskflow.get_numbers_list
       retries: 1
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: get_numbers_list
       trigger_rule: all_success
       wait_for_downstream: false
+      multiple_outputs: false
       dependencies: []
-      decorator: airflow.decorators.task
     process_results:
+      decorator: airflow.providers.standard.decorators.python.python_task
       outlets: []
-      params: {}
       priority_weight: 1
-      python_callable: simple_taskflow.process_results
+      python_callable: decorator_sample_dag_taskflow.process_results
       retries: 1
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: process_results
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [get_numbers_list]
-      decorator: airflow.decorators.task
+      multiple_outputs: false
+      dependencies:
+      - get_numbers_list
       doubled_num: 2
       numbers_list: +get_numbers_list
+  catchup: false
+  dag_display_name: decorator_sample_dag
   description: Sample DAG using TaskFlow API decorators
+  owner_links: {}
+  start_date:
+    __type__: datetime.datetime
+    year: 2026
+    month: 1
+    day: 1
+  tags: []

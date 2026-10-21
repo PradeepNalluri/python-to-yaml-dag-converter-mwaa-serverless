@@ -2,7 +2,11 @@ example_emr_eks:
   dag_id: example_emr_eks
   params: {}
   default_args:
-    start_date: '2026-01-01'
+    start_date:
+      __type__: datetime.datetime
+      year: 2026
+      month: 1
+      day: 1
   schedule: '@once'
   tasks:
     create_bucket:
@@ -10,11 +14,17 @@ example_emr_eks:
       aws_conn_id: aws_default
       bucket_name: test-bucket
       outlets: []
-      params: {}
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: create_bucket
       trigger_rule: all_success
       wait_for_downstream: false
@@ -38,18 +48,25 @@ example_emr_eks:
         print(s)
       encrypt: false
       outlets: []
-      params: {}
       priority_weight: 1
       replace: false
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
       s3_bucket: test-bucket
       s3_key: pi.py
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: upload_s3_file
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [create_bucket]
+      dependencies:
+      - create_bucket
     create_cluster_and_nodegroup:
       operator: airflow.providers.amazon.aws.operators.eks.EksCreateClusterOperator
       aws_conn_id: aws_default
@@ -63,24 +80,34 @@ example_emr_eks:
           name: test-launch-template
       deferrable: false
       fargate_profile_name: profile
-      fargate_selectors: [{namespace: default}]
+      fargate_selectors:
+      - namespace: default
       nodegroup_name: test-nodegroup
       nodegroup_role_arn: test-role-arn
       outlets: []
-      params: {}
       priority_weight: 1
       resources_vpc_config:
-        subnetIds: [subnet-12345ab, subnet-67890cd]
+        subnetIds:
+        - subnet-12345ab
+        - subnet-67890cd
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: create_cluster_and_nodegroup
       trigger_rule: all_success
       wait_for_completion: false
       wait_for_downstream: false
       waiter_delay: 30
       waiter_max_attempts: 40
-      dependencies: [create_launch_template]
+      dependencies:
+      - create_launch_template
     await_create_nodegroup:
       operator: airflow.providers.amazon.aws.sensors.eks.EksNodegroupStateSensor
       aws_conn_id: aws_default
@@ -88,39 +115,56 @@ example_emr_eks:
       mode: poke
       nodegroup_name: test-nodegroup
       outlets: []
-      params: {}
       poke_interval: 10
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
-      target_state: ACTIVE
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
+      target_state:
+        __type__: airflow.providers.amazon.aws.hooks.eks.NodegroupStates
+        __args__:
+        - ACTIVE
       task_id: await_create_nodegroup
       timeout: 604800.0
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [create_cluster_and_nodegroup]
+      dependencies:
+      - create_cluster_and_nodegroup
     create_emr_eks_cluster:
       operator: airflow.providers.amazon.aws.operators.emr.EmrEksCreateClusterOperator
       aws_conn_id: aws_default
       eks_cluster_name: test-cluster
       eks_namespace: default
       outlets: []
-      params: {}
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: create_emr_eks_cluster
       trigger_rule: all_success
       virtual_cluster_id: ''
       virtual_cluster_name: test-virtual-cluster
       wait_for_downstream: false
-      dependencies: [update_trust_policy_execution_role]
+      dependencies:
+      - update_trust_policy_execution_role
     start_job:
       operator: airflow.providers.amazon.aws.operators.emr.EmrContainerOperator
       aws_conn_id: aws_default
-      client_request_token: f0abb43b-7350-420b-8585-b1f8fb1f8a73
+      client_request_token: 6953810b-c8df-40d3-8809-3e453af58b12
       configuration_overrides:
         monitoringConfiguration:
           cloudWatchMonitoringConfiguration:
@@ -136,42 +180,56 @@ example_emr_eks:
       job_retry_max_attempts: 5
       name: pi.py
       outlets: []
-      params: {}
       poll_interval: 30
       priority_weight: 1
       release_label: emr-7.0.0-latest
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: start_job
       trigger_rule: all_success
-      virtual_cluster_id: '{{ task_instance.xcom_pull(task_ids=''create_emr_eks_cluster'',
-        key=''return_value'') }}'
+      virtual_cluster_id: "{{ task_instance.xcom_pull(task_ids='create_emr_eks_cluster',\
+        \ key='return_value') }}"
       wait_for_completion: false
       wait_for_downstream: false
-      dependencies: [create_emr_eks_cluster]
+      dependencies:
+      - create_emr_eks_cluster
     job_waiter:
       operator: airflow.providers.amazon.aws.sensors.emr.EmrContainerSensor
       aws_conn_id: aws_default
       deferrable: false
-      job_id: '{{ task_instance.xcom_pull(task_ids=''start_job'', key=''return_value'')
-        }}'
+      job_id: "{{ task_instance.xcom_pull(task_ids='start_job', key='return_value')\
+        \ }}"
       mode: poke
       outlets: []
-      params: {}
       poke_interval: 60.0
       poll_interval: 10
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: job_waiter
       timeout: 604800.0
       trigger_rule: all_success
-      virtual_cluster_id: '{{ task_instance.xcom_pull(task_ids=''create_emr_eks_cluster'',
-        key=''return_value'') }}'
+      virtual_cluster_id: "{{ task_instance.xcom_pull(task_ids='create_emr_eks_cluster',\
+        \ key='return_value') }}"
       wait_for_downstream: false
-      dependencies: [start_job]
+      dependencies:
+      - start_job
     delete_eks_cluster:
       operator: airflow.providers.amazon.aws.operators.eks.EksDeleteClusterOperator
       aws_conn_id: aws_default
@@ -179,135 +237,216 @@ example_emr_eks:
       deferrable: false
       force_delete_compute: true
       outlets: []
-      params: {}
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: delete_eks_cluster
       trigger_rule: all_done
       wait_for_completion: false
       wait_for_downstream: false
       waiter_delay: 30
       waiter_max_attempts: 40
-      dependencies: [delete_virtual_cluster]
+      dependencies:
+      - delete_virtual_cluster
     await_delete_eks_cluster:
       operator: airflow.providers.amazon.aws.sensors.eks.EksClusterStateSensor
       aws_conn_id: aws_default
       cluster_name: test-cluster
       mode: poke
       outlets: []
-      params: {}
       poke_interval: 10
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
-      target_state: NONEXISTENT
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
+      target_state:
+        __type__: airflow.providers.amazon.aws.hooks.eks.ClusterStates
+        __args__:
+        - NONEXISTENT
       task_id: await_delete_eks_cluster
       timeout: 604800.0
       trigger_rule: all_done
       wait_for_downstream: false
-      dependencies: [delete_eks_cluster]
+      dependencies:
+      - delete_eks_cluster
     delete_bucket:
       operator: airflow.providers.amazon.aws.operators.s3.S3DeleteBucketOperator
       aws_conn_id: aws_default
       bucket_name: test-bucket
       force_delete: true
       outlets: []
-      params: {}
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: delete_bucket
       trigger_rule: all_done
       wait_for_downstream: false
-      dependencies: [delete_launch_template]
+      dependencies:
+      - delete_launch_template
     create_launch_template:
+      decorator: airflow.providers.standard.decorators.python.python_task
       outlets: []
-      params: {}
       priority_weight: 1
-      python_callable: airflow_emr_eks.create_launch_template
+      python_callable: example_emr_eks_taskflow.create_launch_template
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: create_launch_template
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [upload_s3_file]
-      decorator: airflow.decorators.task
+      multiple_outputs: false
+      dependencies:
+      - upload_s3_file
       template_name: test-launch-template
     run_eksctl_commands:
+      decorator: airflow.providers.standard.decorators.python.python_task
       outlets: []
-      params: {}
       priority_weight: 1
-      python_callable: airflow_emr_eks.run_eksctl_commands
+      python_callable: example_emr_eks_taskflow.run_eksctl_commands
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: run_eksctl_commands
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [await_create_nodegroup]
-      decorator: airflow.decorators.task
+      multiple_outputs: false
+      dependencies:
+      - await_create_nodegroup
       cluster_name: test-cluster
       ns: default
     update_trust_policy_execution_role:
+      decorator: airflow.providers.standard.decorators.python.python_task
       outlets: []
-      params: {}
       priority_weight: 1
-      python_callable: airflow_emr_eks.update_trust_policy_execution_role
+      python_callable: example_emr_eks_taskflow.update_trust_policy_execution_role
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: update_trust_policy_execution_role
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [run_eksctl_commands]
-      decorator: airflow.decorators.task
+      multiple_outputs: false
+      dependencies:
+      - run_eksctl_commands
       cluster_name: test-cluster
       cluster_namespace: default
       role_name: test-job-role-name
     delete_iam_oidc_identity_provider:
+      decorator: airflow.providers.standard.decorators.python.python_task
       outlets: []
-      params: {}
       priority_weight: 1
-      python_callable: airflow_emr_eks.delete_iam_oidc_identity_provider
+      python_callable: example_emr_eks_taskflow.delete_iam_oidc_identity_provider
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: delete_iam_oidc_identity_provider
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [job_waiter]
-      decorator: airflow.decorators.task
+      multiple_outputs: false
+      dependencies:
+      - job_waiter
       cluster_name: test-cluster
     delete_virtual_cluster:
+      decorator: airflow.providers.standard.decorators.python.python_task
       outlets: []
-      params: {}
       priority_weight: 1
-      python_callable: airflow_emr_eks.delete_virtual_cluster
+      python_callable: example_emr_eks_taskflow.delete_virtual_cluster
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: delete_virtual_cluster
       trigger_rule: all_done
       wait_for_downstream: false
-      dependencies: [delete_iam_oidc_identity_provider]
-      decorator: airflow.decorators.task
+      multiple_outputs: false
+      dependencies:
+      - delete_iam_oidc_identity_provider
       virtual_cluster_id: +create_emr_eks_cluster
     delete_launch_template:
+      decorator: airflow.providers.standard.decorators.python.python_task
       outlets: []
-      params: {}
       priority_weight: 1
-      python_callable: airflow_emr_eks.delete_launch_template
+      python_callable: example_emr_eks_taskflow.delete_launch_template
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: delete_launch_template
       trigger_rule: all_done
       wait_for_downstream: false
-      dependencies: [await_delete_eks_cluster]
-      decorator: airflow.decorators.task
+      multiple_outputs: false
+      dependencies:
+      - await_delete_eks_cluster
       template_name: test-launch-template
+  catchup: false
+  dag_display_name: example_emr_eks
+  owner_links: {}
+  start_date:
+    __type__: datetime.datetime
+    year: 2026
+    month: 1
+    day: 1
+  tags: []

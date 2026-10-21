@@ -2,22 +2,33 @@ example_ecs:
   dag_id: example_ecs
   params: {}
   default_args:
-    start_date: '2026-01-01'
+    start_date:
+      __type__: datetime.datetime
+      year: 2026
+      month: 1
+      day: 1
   schedule: '@once'
   tasks:
     get_region:
+      decorator: airflow.providers.standard.decorators.python.python_task
       outlets: []
-      params: {}
       priority_weight: 1
-      python_callable: airflow_ecs.get_region
+      python_callable: example_ecs_taskflow.get_region
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: get_region
       trigger_rule: all_success
       wait_for_downstream: false
+      multiple_outputs: false
       dependencies: []
-      decorator: airflow.decorators.task
     create_cluster:
       operator: airflow.providers.amazon.aws.operators.ecs.EcsCreateClusterOperator
       aws_conn_id: aws_default
@@ -25,176 +36,284 @@ example_ecs:
       create_cluster_kwargs: {}
       deferrable: false
       outlets: []
-      params: {}
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: create_cluster
       trigger_rule: all_success
       wait_for_completion: false
       wait_for_downstream: false
       waiter_delay: 15
       waiter_max_attempts: 60
-      dependencies: [get_region]
+      dependencies:
+      - get_region
     await_cluster:
       operator: airflow.providers.amazon.aws.sensors.ecs.EcsClusterStateSensor
       aws_conn_id: aws_default
       cluster_name: test-cluster
-      failure_states: '{<EcsClusterStates.INACTIVE: ''INACTIVE''>, <EcsClusterStates.FAILED:
-        ''FAILED''>}'
+      failure_states:
+      - __type__: airflow.providers.amazon.aws.hooks.ecs.EcsClusterStates
+        __args__:
+        - INACTIVE
+      - __type__: airflow.providers.amazon.aws.hooks.ecs.EcsClusterStates
+        __args__:
+        - FAILED
       mode: poke
       outlets: []
-      params: {}
       poke_interval: 60.0
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
-      target_state: EcsClusterStates.ACTIVE
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: await_cluster
       timeout: 604800.0
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [create_cluster]
+      dependencies:
+      - create_cluster
     register_task:
       operator: airflow.providers.amazon.aws.operators.ecs.EcsRegisterTaskDefinitionOperator
       aws_conn_id: aws_default
-      container_definitions: [{name: test-container, image: ubuntu, workingDirectory: /usr/bin,
-          entryPoint: [sh, -c], command: [ls], logConfiguration: {logDriver: awslogs,
-            options: {awslogs-group: /ecs_test/test, awslogs-region: '{{ task_instance.xcom_pull(task_ids=''get_region'',
-                key=''return_value'') }}', awslogs-create-group: 'true', awslogs-stream-prefix: ecs}}}]
+      container_definitions:
+      - name: test-container
+        image: ubuntu
+        workingDirectory: /usr/bin
+        entryPoint:
+        - sh
+        - -c
+        command:
+        - ls
+        logConfiguration:
+          logDriver: awslogs
+          options:
+            awslogs-group: /ecs_test/test
+            awslogs-region: "{{ task_instance.xcom_pull(task_ids='get_region', key='return_value')\
+              \ }}"
+            awslogs-create-group: 'true'
+            awslogs-stream-prefix: ecs
       family: test-task-definition
       outlets: []
-      params: {}
       priority_weight: 1
       register_task_kwargs:
         cpu: '256'
         memory: '512'
         networkMode: awsvpc
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: register_task
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [get_region, await_cluster]
+      dependencies:
+      - get_region
+      - await_cluster
     await_task_definition:
       operator: airflow.providers.amazon.aws.sensors.ecs.EcsTaskDefinitionStateSensor
       aws_conn_id: aws_default
       mode: poke
       outlets: []
-      params: {}
       poke_interval: 60.0
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
-      target_state: EcsTaskDefinitionStates.ACTIVE
-      task_definition: '{{ task_instance.xcom_pull(task_ids=''register_task'', key=''return_value'')
-        }}'
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
+      task_definition: "{{ task_instance.xcom_pull(task_ids='register_task', key='return_value')\
+        \ }}"
       task_id: await_task_definition
       timeout: 604800.0
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [register_task]
+      dependencies:
+      - register_task
     run_task:
       operator: airflow.providers.amazon.aws.operators.ecs.EcsRunTaskOperator
       aws_conn_id: aws_default
-      awslogs_fetch_interval: 30.0
+      awslogs_fetch_interval:
+        __type__: datetime.timedelta
+        seconds: 30.0
       awslogs_group: /ecs_test/test
-      awslogs_region: '{{ task_instance.xcom_pull(task_ids=''get_region'', key=''return_value'')
-        }}'
+      awslogs_region: "{{ task_instance.xcom_pull(task_ids='get_region', key='return_value')\
+        \ }}"
       awslogs_stream_prefix: ecs/test-container
       cluster: test-cluster
       deferrable: false
       launch_type: EC2
       network_configuration:
         awsvpcConfiguration:
-          subnets: [subnet-12345678, subnet-87654321]
+          subnets:
+          - subnet-12345678
+          - subnet-87654321
       number_logs_exception: 10
       outlets: []
       overrides:
-        containerOverrides: [{name: test-container, command: [echo hello world]}]
-      params: {}
+        containerOverrides:
+        - name: test-container
+          command:
+          - echo hello world
       priority_weight: 1
       reattach: false
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
-      task_definition: '{{ task_instance.xcom_pull(task_ids=''register_task'', key=''return_value'')
-        }}'
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
+      task_definition: "{{ task_instance.xcom_pull(task_ids='register_task', key='return_value')\
+        \ }}"
       task_id: run_task
       trigger_rule: all_success
       wait_for_completion: true
       wait_for_downstream: false
       waiter_delay: 6
       waiter_max_attempts: 1000000
-      dependencies: [register_task, get_region, await_task_definition]
+      dependencies:
+      - get_region
+      - register_task
+      - await_task_definition
     deregister_task:
       operator: airflow.providers.amazon.aws.operators.ecs.EcsDeregisterTaskDefinitionOperator
       aws_conn_id: aws_default
       outlets: []
-      params: {}
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
-      task_definition: '{{ task_instance.xcom_pull(task_ids=''register_task'', key=''return_value'')
-        }}'
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
+      task_definition: "{{ task_instance.xcom_pull(task_ids='register_task', key='return_value')\
+        \ }}"
       task_id: deregister_task
       trigger_rule: all_done
       wait_for_downstream: false
-      dependencies: [register_task, run_task]
+      dependencies:
+      - register_task
+      - run_task
     delete_cluster:
       operator: airflow.providers.amazon.aws.operators.ecs.EcsDeleteClusterOperator
       aws_conn_id: aws_default
       cluster_name: test-cluster
       deferrable: false
       outlets: []
-      params: {}
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: delete_cluster
       trigger_rule: all_done
       wait_for_completion: false
       wait_for_downstream: false
       waiter_delay: 15
       waiter_max_attempts: 60
-      dependencies: [deregister_task]
+      dependencies:
+      - deregister_task
     await_delete_cluster:
       operator: airflow.providers.amazon.aws.sensors.ecs.EcsClusterStateSensor
       aws_conn_id: aws_default
       cluster_name: test-cluster
-      failure_states: '{<EcsClusterStates.INACTIVE: ''INACTIVE''>, <EcsClusterStates.FAILED:
-        ''FAILED''>}'
+      failure_states:
+      - __type__: airflow.providers.amazon.aws.hooks.ecs.EcsClusterStates
+        __args__:
+        - INACTIVE
+      - __type__: airflow.providers.amazon.aws.hooks.ecs.EcsClusterStates
+        __args__:
+        - FAILED
       mode: poke
       outlets: []
-      params: {}
       poke_interval: 60.0
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
-      target_state: EcsClusterStates.INACTIVE
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
+      target_state:
+        __type__: airflow.providers.amazon.aws.hooks.ecs.EcsClusterStates
+        __args__:
+        - INACTIVE
       task_id: await_delete_cluster
       timeout: 604800.0
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [delete_cluster]
+      dependencies:
+      - delete_cluster
     clean_logs:
+      decorator: airflow.providers.standard.decorators.python.python_task
       outlets: []
-      params: {}
       priority_weight: 1
-      python_callable: airflow_ecs.clean_logs
+      python_callable: example_ecs_taskflow.clean_logs
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: clean_logs
       trigger_rule: all_done
       wait_for_downstream: false
-      dependencies: [await_delete_cluster]
-      decorator: airflow.decorators.task
+      multiple_outputs: false
+      dependencies:
+      - await_delete_cluster
       group_name: /ecs_test/test
+  catchup: false
+  dag_display_name: example_ecs
+  owner_links: {}
+  start_date:
+    __type__: datetime.datetime
+    year: 2026
+    month: 1
+    day: 1
+  tags: []

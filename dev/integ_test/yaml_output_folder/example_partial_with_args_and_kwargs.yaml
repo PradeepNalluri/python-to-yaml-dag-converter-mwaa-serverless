@@ -2,53 +2,86 @@ example_partial_with_args_and_kwargs:
   dag_id: example_partial_with_args_and_kwargs
   params: {}
   default_args:
-    start_date: '2026-01-01'
-  schedule: 0 0 * * ? *
+    start_date:
+      __type__: datetime.datetime
+      year: 2026
+      month: 1
+      day: 1
+  schedule: '@daily'
   tasks:
     get_items:
+      decorator: airflow.providers.standard.decorators.python.python_task
       outlets: []
-      params: {}
       priority_weight: 1
-      python_callable: dtm_taskflow_complex.get_items
+      python_callable: example_partial_with_args_and_kwargs_taskflow.get_items
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: get_items
       trigger_rule: all_success
       wait_for_downstream: false
+      multiple_outputs: false
       dependencies: []
-      decorator: airflow.decorators.task
     process_item:
-      operator: airflow.providers.standard.decorators.python._PythonDecoratedOperator
+      decorator: airflow.providers.standard.decorators.python.python_task
       outlets: []
-      params: {}
       priority_weight: 1
-      python_callable: dtm_taskflow_complex.process_item
+      python_callable: example_partial_with_args_and_kwargs_taskflow.process_item
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: process_item
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [get_items]
+      dependencies:
+      - get_items
       expand:
         item: +get_items
       partial:
-        op_kwargs:
-          prefix: item
-          capitalize: true
-        op_args: []
+        prefix: item
+        capitalize: true
     aggregate_results:
+      decorator: airflow.providers.standard.decorators.python.python_task
       outlets: []
-      params: {}
       priority_weight: 1
-      python_callable: dtm_taskflow_complex.aggregate_results
+      python_callable: example_partial_with_args_and_kwargs_taskflow.aggregate_results
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: aggregate_results
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [process_item]
-      decorator: airflow.decorators.task
+      multiple_outputs: false
+      dependencies:
+      - process_item
       results: +process_item
+  catchup: false
+  dag_display_name: example_partial_with_args_and_kwargs
+  owner_links: {}
+  start_date:
+    __type__: datetime.datetime
+    year: 2026
+    month: 1
+    day: 1
+  tags: []

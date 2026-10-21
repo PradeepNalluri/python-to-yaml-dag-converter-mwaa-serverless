@@ -44,10 +44,6 @@ example_rds_instance:
       operator: airflow.providers.amazon.aws.sensors.rds.RdsDbSensor
       aws_conn_id: aws_default
       db_identifier: test-database
-      db_type:
-        __type__: airflow.providers.amazon.aws.utils.rds.RdsDbType
-        __args__:
-        - instance
       hook_params: {}
       mode: poke
       outlets: []
@@ -75,10 +71,6 @@ example_rds_instance:
       operator: airflow.providers.amazon.aws.operators.rds.RdsStopDbOperator
       aws_conn_id: aws_default
       db_identifier: test-database
-      db_type:
-        __type__: airflow.providers.amazon.aws.utils.rds.RdsDbType
-        __args__:
-        - instance
       deferrable: false
       outlets: []
       priority_weight: 1
@@ -104,10 +96,6 @@ example_rds_instance:
       operator: airflow.providers.amazon.aws.operators.rds.RdsStartDbOperator
       aws_conn_id: aws_default
       db_identifier: test-database
-      db_type:
-        __type__: airflow.providers.amazon.aws.utils.rds.RdsDbType
-        __args__:
-        - instance
       deferrable: false
       outlets: []
       priority_weight: 1

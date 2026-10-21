@@ -2,7 +2,11 @@ example_http_to_s3:
   dag_id: example_http_to_s3
   params: {}
   default_args:
-    start_date: '2026-01-01'
+    start_date:
+      __type__: datetime.datetime
+      year: 2026
+      month: 1
+      day: 1
   schedule: '@once'
   tasks:
     create_s3_bucket:
@@ -10,29 +14,42 @@ example_http_to_s3:
       aws_conn_id: aws_default
       bucket_name: test-http-to-s3-bucket
       outlets: []
-      params: {}
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: create_s3_bucket
       trigger_rule: all_success
       wait_for_downstream: false
       dependencies: []
     create_connection:
+      decorator: airflow.providers.standard.decorators.python.python_task
       outlets: []
-      params: {}
       priority_weight: 1
+      python_callable: example_http_to_s3_taskflow.create_connection
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: create_connection
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [create_s3_bucket]
-      decorator: airflow.decorators.task
-      python_callable_file: /local/home/timottum/python-to-yaml-dag-converter-mwaa-serverless/dev/integ_test/python_test_folder/airflow_http_to_s3.py
-      python_callable_name: create_connection
+      multiple_outputs: false
+      dependencies:
+      - create_s3_bucket
       conn_id_name: test-conn-id
     start_server:
       operator: airflow.providers.standard.operators.bash.BashOperator
@@ -50,15 +67,22 @@ example_http_to_s3:
         sleep 2
         exit 0
       outlets: []
-      params: {}
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: start_server
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [create_connection]
+      dependencies:
+      - create_connection
     http_to_s3_task:
       operator: airflow.providers.amazon.aws.transfers.http_to_s3.HttpToS3Operator
       aws_conn_id: aws_default
@@ -71,14 +95,20 @@ example_http_to_s3:
       log_response: false
       method: GET
       outlets: []
-      params: {}
       priority_weight: 1
       replace: true
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
       s3_bucket: test-http-to-s3-bucket
       s3_key: test-http-to-s3-key
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: http_to_s3_task
       tcp_keep_alive: true
       tcp_keep_alive_count: 20
@@ -86,32 +116,56 @@ example_http_to_s3:
       tcp_keep_alive_interval: 30
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [start_server]
+      dependencies:
+      - start_server
     stop_simple_http_server:
       operator: airflow.providers.standard.operators.bash.BashOperator
       bash_command: kill {{ti.xcom_pull(task_ids="start_server")}}
       outlets: []
-      params: {}
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: stop_simple_http_server
       trigger_rule: all_done
       wait_for_downstream: false
-      dependencies: [http_to_s3_task]
+      dependencies:
+      - http_to_s3_task
     delete_s3_bucket:
       operator: airflow.providers.amazon.aws.operators.s3.S3DeleteBucketOperator
       aws_conn_id: aws_default
       bucket_name: test-http-to-s3-bucket
       force_delete: true
       outlets: []
-      params: {}
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: delete_s3_bucket
       trigger_rule: all_done
       wait_for_downstream: false
-      dependencies: [stop_simple_http_server]
+      dependencies:
+      - stop_simple_http_server
+  catchup: false
+  dag_display_name: example_http_to_s3
+  owner_links: {}
+  start_date:
+    __type__: datetime.datetime
+    year: 2026
+    month: 1
+    day: 1
+  tags: []

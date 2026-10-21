@@ -1,0 +1,134 @@
+example_hive_to_dynamodb:
+  dag_id: example_hive_to_dynamodb
+  params: {}
+  default_args:
+    start_date:
+      __type__: datetime.datetime
+      year: 2026
+      month: 1
+      day: 1
+  schedule: '@once'
+  tasks:
+    backup_to_dynamodb:
+      operator: airflow.providers.amazon.aws.transfers.hive_to_dynamodb.HiveToDynamoDBOperator
+      aws_conn_id: aws_default
+      hiveserver2_conn_id: test-hive-connection-id
+      outlets: []
+      priority_weight: 1
+      retries: 0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
+      retry_exponential_backoff: false
+      schema: default
+      sql: SELECT feature_id, feature_name, feature_class, state_alpha FROM hive_features
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
+      table_keys:
+      - feature_id
+      table_name: test-hive_to_dynamo
+      task_id: backup_to_dynamodb
+      trigger_rule: all_success
+      wait_for_downstream: false
+      dependencies:
+      - create_dynamodb_table
+    configure_hive_connection:
+      decorator: airflow.providers.standard.decorators.python.python_task
+      outlets: []
+      priority_weight: 1
+      python_callable: example_hive_to_dynamodb_taskflow.configure_hive_connection
+      retries: 0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
+      retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
+      task_id: configure_hive_connection
+      trigger_rule: all_success
+      wait_for_downstream: false
+      multiple_outputs: false
+      dependencies: []
+      connection_id: test-hive-connection-id
+      hostname: test-hive-hostname
+    create_dynamodb_table:
+      decorator: airflow.providers.standard.decorators.python.python_task
+      outlets: []
+      priority_weight: 1
+      python_callable: example_hive_to_dynamodb_taskflow.create_dynamodb_table
+      retries: 0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
+      retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
+      task_id: create_dynamodb_table
+      trigger_rule: all_success
+      wait_for_downstream: false
+      multiple_outputs: false
+      dependencies:
+      - configure_hive_connection
+      table_name: test-hive_to_dynamo
+    get_dynamodb_item_count:
+      decorator: airflow.providers.standard.decorators.python.python_task
+      outlets: []
+      priority_weight: 1
+      python_callable: example_hive_to_dynamodb_taskflow.get_dynamodb_item_count
+      retries: 0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
+      retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
+      task_id: get_dynamodb_item_count
+      trigger_rule: all_success
+      wait_for_downstream: false
+      multiple_outputs: false
+      dependencies:
+      - backup_to_dynamodb
+      table_name: test-hive_to_dynamo
+    delete_dynamodb_table:
+      decorator: airflow.providers.standard.decorators.python.python_task
+      outlets: []
+      priority_weight: 1
+      python_callable: example_hive_to_dynamodb_taskflow.delete_dynamodb_table
+      retries: 0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
+      retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
+      task_id: delete_dynamodb_table
+      trigger_rule: all_done
+      wait_for_downstream: false
+      multiple_outputs: false
+      dependencies:
+      - get_dynamodb_item_count
+      table_name: test-hive_to_dynamo
+  catchup: false
+  dag_display_name: example_hive_to_dynamodb
+  owner_links: {}
+  start_date:
+    __type__: datetime.datetime
+    year: 2026
+    month: 1
+    day: 1
+  tags: []

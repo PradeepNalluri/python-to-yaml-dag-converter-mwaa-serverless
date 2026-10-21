@@ -2,7 +2,11 @@ example_neptune:
   dag_id: example_neptune
   params: {}
   default_args:
-    start_date: '2026-01-01'
+    start_date:
+      __type__: datetime.datetime
+      year: 2026
+      month: 1
+      day: 1
   schedule: '@once'
   tasks:
     start_task:
@@ -10,11 +14,17 @@ example_neptune:
       aws_conn_id: aws_default
       deferrable: false
       outlets: []
-      params: {}
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: start_task
       trigger_rule: all_success
       wait_for_completion: true
@@ -22,17 +32,24 @@ example_neptune:
       waiter_delay: 30
       waiter_max_attempts: 60
       db_cluster_id: test-cluster
-      dependencies: [create_cluster]
+      dependencies:
+      - create_cluster
     stop_task:
       operator: airflow.providers.amazon.aws.operators.neptune.NeptuneStopDbClusterOperator
       aws_conn_id: aws_default
       deferrable: false
       outlets: []
-      params: {}
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: stop_task
       trigger_rule: all_success
       wait_for_completion: true
@@ -40,32 +57,57 @@ example_neptune:
       waiter_delay: 30
       waiter_max_attempts: 60
       db_cluster_id: test-cluster
-      dependencies: [start_task]
+      dependencies:
+      - start_task
     create_cluster:
+      decorator: airflow.providers.standard.decorators.python.python_task
       outlets: []
-      params: {}
       priority_weight: 1
-      python_callable: airflow_neptune.create_cluster
+      python_callable: example_neptune_taskflow.create_cluster
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: create_cluster
       trigger_rule: all_success
       wait_for_downstream: false
+      multiple_outputs: false
       dependencies: []
-      decorator: airflow.decorators.task
       cluster_id: test-cluster
     delete_cluster:
+      decorator: airflow.providers.standard.decorators.python.python_task
       outlets: []
-      params: {}
       priority_weight: 1
-      python_callable: airflow_neptune.delete_cluster
+      python_callable: example_neptune_taskflow.delete_cluster
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: delete_cluster
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [stop_task]
-      decorator: airflow.decorators.task
+      multiple_outputs: false
+      dependencies:
+      - stop_task
       cluster_id: test-cluster
+  catchup: false
+  dag_display_name: example_neptune
+  owner_links: {}
+  start_date:
+    __type__: datetime.datetime
+    year: 2026
+    month: 1
+    day: 1
+  tags: []

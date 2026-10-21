@@ -347,8 +347,6 @@ example_redshift_s3_transfers:
     transfer_s3_to_redshift:
       operator: airflow.providers.amazon.aws.transfers.s3_to_redshift.S3ToRedshiftOperator
       autocommit: false
-      aws_conn_id:
-        __type__: airflow.sdk.definitions._internal.types.ArgNotSet
       copy_options:
       - csv
       method: APPEND
@@ -414,8 +412,6 @@ example_redshift_s3_transfers:
     transfer_s3_to_redshift_tmp_table:
       operator: airflow.providers.amazon.aws.transfers.s3_to_redshift.S3ToRedshiftOperator
       autocommit: false
-      aws_conn_id:
-        __type__: airflow.sdk.definitions._internal.types.ArgNotSet
       copy_options:
       - csv
       method: APPEND
@@ -447,8 +443,6 @@ example_redshift_s3_transfers:
     transfer_s3_to_redshift_multiple:
       operator: airflow.providers.amazon.aws.transfers.s3_to_redshift.S3ToRedshiftOperator
       autocommit: false
-      aws_conn_id:
-        __type__: airflow.sdk.definitions._internal.types.ArgNotSet
       copy_options:
       - csv
       method: APPEND

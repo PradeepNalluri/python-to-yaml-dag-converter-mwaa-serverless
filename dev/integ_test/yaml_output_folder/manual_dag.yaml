@@ -3,48 +3,90 @@ manual_dag:
   params: {}
   default_args:
     owner: airflow
-    start_date: '2026-01-01'
-  schedule: 0 0 * * ? *
+    start_date:
+      __type__: datetime.datetime
+      year: 2026
+      month: 1
+      day: 1
+  schedule: '@daily'
   tasks:
     extract:
+      decorator: airflow.providers.standard.decorators.python.python_task
       outlets: []
-      params: {}
       priority_weight: 1
-      python_callable: taskflow_mwaa_1.extract
+      python_callable: manual_dag_taskflow.extract
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: extract
       trigger_rule: all_success
       wait_for_downstream: false
+      multiple_outputs: false
       dependencies: []
-      decorator: airflow.decorators.task
     transform:
+      decorator: airflow.providers.standard.decorators.python.python_task
       outlets: []
-      params: {}
       priority_weight: 1
-      python_callable: taskflow_mwaa_1.transform
+      python_callable: manual_dag_taskflow.transform
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: transform
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [extract]
-      decorator: airflow.decorators.task
+      multiple_outputs: true
+      dependencies:
+      - extract
       order_data_dict: +extract
     load:
+      decorator: airflow.providers.standard.decorators.python.python_task
       outlets: []
-      params: {}
       priority_weight: 1
-      python_callable: taskflow_mwaa_1.load
+      python_callable: manual_dag_taskflow.load
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: load
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [transform]
-      decorator: airflow.decorators.task
-      total_order_value: '{{ task_instance.xcom_pull(task_ids=''transform'', key=''total_order_value'')
-        }}'
+      multiple_outputs: false
+      dependencies:
+      - transform
+      total_order_value: "{{ task_instance.xcom_pull(task_ids='transform', key='total_order_value')\
+        \ }}"
+  catchup: false
+  dag_display_name: manual_dag
+  doc_md: "\n    ### TaskFlow API Tutorial Documentation\n    This is a simple ETL\
+    \ data pipeline example which demonstrates the use of\n    the TaskFlow API using\
+    \ three simple tasks for Extract, Transform, and Load.\n    Documentation that\
+    \ goes along with the Airflow TaskFlow API tutorial is\n    located\n    [here](https://airflow.apache.org/docs/stable/tutorial_taskflow_api.html)\n\
+    \    "
+  owner_links: {}
+  start_date:
+    __type__: datetime.datetime
+    year: 2026
+    month: 1
+    day: 1
+  tags:
+  - example

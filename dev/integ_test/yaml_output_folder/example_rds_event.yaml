@@ -2,22 +2,33 @@ example_rds_event:
   dag_id: example_rds_event
   params: {}
   default_args:
-    start_date: '2026-01-01'
+    start_date:
+      __type__: datetime.datetime
+      year: 2026
+      month: 1
+      day: 1
   schedule: '@once'
   tasks:
     create_sns_topic:
+      decorator: airflow.providers.standard.decorators.python.python_task
       outlets: []
-      params: {}
       priority_weight: 1
-      python_callable: airflow_rds_event.create_sns_topic
+      python_callable: example_rds_event_taskflow.create_sns_topic
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: create_sns_topic
       trigger_rule: all_success
       wait_for_downstream: false
+      multiple_outputs: false
       dependencies: []
-      decorator: airflow.decorators.task
       env_id: test
     create_db_instance:
       operator: airflow.providers.amazon.aws.operators.rds.RdsCreateDbInstanceOperator
@@ -27,7 +38,6 @@ example_rds_event:
       deferrable: false
       engine: postgres
       outlets: []
-      params: {}
       priority_weight: 1
       rds_kwargs:
         MasterUsername: rds_username
@@ -36,81 +46,131 @@ example_rds_event:
         DBName: test_db
         PubliclyAccessible: false
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: create_db_instance
       trigger_rule: all_success
       wait_for_completion: true
       wait_for_downstream: false
       waiter_delay: 30
       waiter_max_attempts: 60
-      dependencies: [create_sns_topic]
+      dependencies:
+      - create_sns_topic
     create_subscription:
       operator: airflow.providers.amazon.aws.operators.rds.RdsCreateEventSubscriptionOperator
       aws_conn_id: aws_default
       enabled: true
-      event_categories: [availability]
+      event_categories:
+      - availability
       outlets: []
-      params: {}
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
-      sns_topic_arn: '{{ task_instance.xcom_pull(task_ids=''create_sns_topic'', key=''return_value'')
-        }}'
-      source_ids: [test-instance]
+      sns_topic_arn: "{{ task_instance.xcom_pull(task_ids='create_sns_topic', key='return_value')\
+        \ }}"
+      source_ids:
+      - test-instance
       source_type: db-instance
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       subscription_name: test-subscription
       task_id: create_subscription
       trigger_rule: all_success
       wait_for_completion: true
       wait_for_downstream: false
-      dependencies: [create_sns_topic, create_db_instance]
+      dependencies:
+      - create_db_instance
+      - create_sns_topic
     delete_subscription:
       operator: airflow.providers.amazon.aws.operators.rds.RdsDeleteEventSubscriptionOperator
       aws_conn_id: aws_default
       outlets: []
-      params: {}
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       subscription_name: test-subscription
       task_id: delete_subscription
       trigger_rule: all_done
       wait_for_downstream: false
-      dependencies: [create_subscription]
+      dependencies:
+      - create_subscription
     delete_db_instance:
       operator: airflow.providers.amazon.aws.operators.rds.RdsDeleteDbInstanceOperator
       aws_conn_id: aws_default
       db_instance_identifier: test-instance
       deferrable: false
       outlets: []
-      params: {}
       priority_weight: 1
       rds_kwargs:
         SkipFinalSnapshot: true
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: delete_db_instance
       trigger_rule: all_done
       wait_for_completion: true
       wait_for_downstream: false
       waiter_delay: 30
       waiter_max_attempts: 60
-      dependencies: [delete_subscription]
+      dependencies:
+      - delete_subscription
     delete_sns_topic:
+      decorator: airflow.providers.standard.decorators.python.python_task
       outlets: []
-      params: {}
       priority_weight: 1
-      python_callable: airflow_rds_event.delete_sns_topic
+      python_callable: example_rds_event_taskflow.delete_sns_topic
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: delete_sns_topic
       trigger_rule: all_done
       wait_for_downstream: false
-      dependencies: [delete_db_instance, create_sns_topic]
-      decorator: airflow.decorators.task
+      multiple_outputs: false
+      dependencies:
+      - create_sns_topic
+      - delete_db_instance
       topic_arn: +create_sns_topic
+  catchup: false
+  dag_display_name: example_rds_event
+  owner_links: {}
+  start_date:
+    __type__: datetime.datetime
+    year: 2026
+    month: 1
+    day: 1
+  tags: []

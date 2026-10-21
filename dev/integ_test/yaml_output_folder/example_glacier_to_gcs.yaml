@@ -1,0 +1,158 @@
+example_glacier_to_gcs:
+  dag_id: example_glacier_to_gcs
+  params: {}
+  default_args:
+    start_date:
+      __type__: datetime.datetime
+      year: 2026
+      month: 1
+      day: 1
+  schedule: '@once'
+  tasks:
+    create_glacier_job:
+      operator: airflow.providers.amazon.aws.operators.glacier.GlacierCreateJobOperator
+      aws_conn_id: aws_default
+      outlets: []
+      priority_weight: 1
+      retries: 0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
+      retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
+      task_id: create_glacier_job
+      trigger_rule: all_success
+      vault_name: test-vault
+      wait_for_downstream: false
+      dependencies:
+      - create_vault
+    wait_for_operation_complete:
+      operator: airflow.providers.amazon.aws.sensors.glacier.GlacierJobOperationSensor
+      aws_conn_id: aws_default
+      job_id: '{{ task_instance.xcom_pull("create_glacier_job")["jobId"] }}'
+      mode: reschedule
+      outlets: []
+      poke_interval: 1200
+      priority_weight: 1
+      retries: 0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
+      retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
+      task_id: wait_for_operation_complete
+      timeout: 604800.0
+      trigger_rule: all_success
+      vault_name: test-vault
+      wait_for_downstream: false
+      dependencies:
+      - create_glacier_job
+    upload_data_to_glacier:
+      operator: airflow.providers.amazon.aws.operators.glacier.GlacierUploadArchiveOperator
+      aws_conn_id: aws_default
+      body: !!binary |
+        VGVzdCBEYXRh
+      outlets: []
+      priority_weight: 1
+      retries: 0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
+      retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
+      task_id: upload_data_to_glacier
+      trigger_rule: all_success
+      vault_name: test-vault
+      wait_for_downstream: false
+      dependencies:
+      - wait_for_operation_complete
+    transfer_archive_to_gcs:
+      operator: airflow.providers.amazon.aws.transfers.glacier_to_gcs.GlacierToGCSOperator
+      aws_conn_id: aws_default
+      bucket_name: test-bucket
+      chunk_size: 1024
+      gcp_conn_id: google_cloud_default
+      gzip: false
+      object_name: test-object
+      outlets: []
+      priority_weight: 1
+      retries: 0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
+      retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
+      task_id: transfer_archive_to_gcs
+      trigger_rule: all_success
+      vault_name: test-vault
+      wait_for_downstream: false
+      dependencies:
+      - upload_data_to_glacier
+    create_vault:
+      decorator: airflow.providers.standard.decorators.python.python_task
+      outlets: []
+      priority_weight: 1
+      python_callable: example_glacier_to_gcs_taskflow.create_vault
+      retries: 0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
+      retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
+      task_id: create_vault
+      trigger_rule: all_success
+      wait_for_downstream: false
+      multiple_outputs: false
+      dependencies: []
+      vault_name: test-vault
+    delete_vault:
+      decorator: airflow.providers.standard.decorators.python.python_task
+      outlets: []
+      priority_weight: 1
+      python_callable: example_glacier_to_gcs_taskflow.delete_vault
+      retries: 0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
+      retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
+      task_id: delete_vault
+      trigger_rule: all_done
+      wait_for_downstream: false
+      multiple_outputs: false
+      dependencies:
+      - transfer_archive_to_gcs
+      vault_name: test-vault
+  catchup: false
+  dag_display_name: example_glacier_to_gcs
+  owner_links: {}
+  start_date:
+    __type__: datetime.datetime
+    year: 2026
+    month: 1
+    day: 1
+  tags: []

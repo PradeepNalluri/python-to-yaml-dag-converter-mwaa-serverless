@@ -2,7 +2,11 @@ example_kinesis_analytics:
   dag_id: example_kinesis_analytics
   params: {}
   default_args:
-    start_date: '2026-01-01'
+    start_date:
+      __type__: datetime.datetime
+      year: 2026
+      month: 1
+      day: 1
   schedule: '@once'
   tasks:
     create_bucket:
@@ -10,11 +14,17 @@ example_kinesis_analytics:
       aws_conn_id: aws_default
       bucket_name: test-kinesis-analytics
       outlets: []
-      params: {}
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: create_bucket
       trigger_rule: all_success
       wait_for_downstream: false
@@ -25,15 +35,22 @@ example_kinesis_analytics:
       bucket_name: test-kinesis-analytics
       force_delete: true
       outlets: []
-      params: {}
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: delete_bucket
       trigger_rule: all_done
       wait_for_downstream: false
-      dependencies: [delete_kinesis_stream]
+      dependencies:
+      - delete_kinesis_stream
     copy_jar_file:
       operator: airflow.providers.amazon.aws.transfers.http_to_s3.HttpToS3Operator
       aws_conn_id: aws_default
@@ -46,14 +63,20 @@ example_kinesis_analytics:
       log_response: false
       method: GET
       outlets: []
-      params: {}
       priority_weight: 1
       replace: false
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
       s3_bucket: test-kinesis-analytics
       s3_key: code/kds-to-s3-datastream-java-1.0.1.jar
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: copy_jar_file
       tcp_keep_alive: true
       tcp_keep_alive_count: 20
@@ -61,7 +84,8 @@ example_kinesis_analytics:
       tcp_keep_alive_interval: 30
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [create_connection]
+      dependencies:
+      - create_connection
     create_application:
       operator: airflow.providers.amazon.aws.operators.kinesis_analytics.KinesisAnalyticsV2CreateApplicationOperator
       application_description: Managed Service for Apache Flink application created
@@ -77,10 +101,15 @@ example_kinesis_analytics:
               ParallelismPerKPU: 1
               AutoScalingEnabled: false
           EnvironmentProperties:
-            PropertyGroups: [{PropertyGroupId: BlueprintMetadata, PropertyMap: {AWSRegion: us-east-1,
-                  BlueprintName: KDS_FLINK-DATASTREAM-JAVA_S3, BucketName: 's3://test-kinesis-analytics/',
-                  PartitionFormat: yyyy-MM-dd-HH, StreamInitialPosition: TRIM_HORIZON,
-                  StreamName: test-test-stream}}]
+            PropertyGroups:
+            - PropertyGroupId: BlueprintMetadata
+              PropertyMap:
+                AWSRegion: us-east-1
+                BlueprintName: KDS_FLINK-DATASTREAM-JAVA_S3
+                BucketName: s3://test-kinesis-analytics/
+                PartitionFormat: yyyy-MM-dd-HH
+                StreamInitialPosition: TRIM_HORIZON
+                StreamName: test-test-stream
           ApplicationCodeConfiguration:
             CodeContent:
               S3ContentLocation:
@@ -88,36 +117,50 @@ example_kinesis_analytics:
                 FileKey: code/kds-to-s3-datastream-java-1.0.1.jar
             CodeContentType: ZIPFILE
       outlets: []
-      params: {}
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
       runtime_environment: FLINK-1_18
       service_execution_role: test-role-arn
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: create_application
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [delete_connection]
+      dependencies:
+      - delete_connection
     start_application:
       operator: airflow.providers.amazon.aws.operators.kinesis_analytics.KinesisAnalyticsV2StartApplicationOperator
       application_name: test-test-app
       aws_conn_id: aws_default
       deferrable: false
       outlets: []
-      params: {}
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
       run_configuration: {}
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: start_application
       trigger_rule: all_success
       wait_for_completion: false
       wait_for_downstream: false
       waiter_delay: 60
       waiter_max_attempts: 20
-      dependencies: [create_application]
+      dependencies:
+      - create_application
     await_start_application:
       operator: airflow.providers.amazon.aws.sensors.kinesis_analytics.KinesisAnalyticsV2StartApplicationCompletedSensor
       application_name: test-test-app
@@ -126,17 +169,24 @@ example_kinesis_analytics:
       max_retries: 75
       mode: poke
       outlets: []
-      params: {}
       poke_interval: 120
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: await_start_application
       timeout: 604800.0
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [start_application]
+      dependencies:
+      - start_application
     stop_application:
       operator: airflow.providers.amazon.aws.operators.kinesis_analytics.KinesisAnalyticsV2StopApplicationOperator
       application_name: test-test-app
@@ -144,18 +194,25 @@ example_kinesis_analytics:
       deferrable: false
       force: true
       outlets: []
-      params: {}
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: stop_application
       trigger_rule: all_success
       wait_for_completion: false
       wait_for_downstream: false
       waiter_delay: 60
       waiter_max_attempts: 20
-      dependencies: [await_start_application]
+      dependencies:
+      - await_start_application
     await_stop_application:
       operator: airflow.providers.amazon.aws.sensors.kinesis_analytics.KinesisAnalyticsV2StopApplicationCompletedSensor
       application_name: test-test-app
@@ -164,86 +221,142 @@ example_kinesis_analytics:
       max_retries: 75
       mode: poke
       outlets: []
-      params: {}
       poke_interval: 120
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: await_stop_application
       timeout: 604800.0
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [stop_application]
+      dependencies:
+      - stop_application
     create_kinesis_stream:
+      decorator: airflow.providers.standard.decorators.python.python_task
       outlets: []
-      params: {}
       priority_weight: 1
-      python_callable: airflow_kinesis_analytics.create_kinesis_stream
+      python_callable: example_kinesis_analytics_taskflow.create_kinesis_stream
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: create_kinesis_stream
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [create_bucket]
-      decorator: airflow.decorators.task
+      multiple_outputs: false
+      dependencies:
+      - create_bucket
       stream: test-test-stream
       region: us-east-1
     create_connection:
+      decorator: airflow.providers.standard.decorators.python.python_task
       outlets: []
-      params: {}
       priority_weight: 1
-      python_callable: airflow_kinesis_analytics.create_connection
+      python_callable: example_kinesis_analytics_taskflow.create_connection
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: create_connection
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [create_kinesis_stream]
-      decorator: airflow.decorators.task
+      multiple_outputs: false
+      dependencies:
+      - create_kinesis_stream
       conn_id: test-git
     delete_connection:
+      decorator: airflow.providers.standard.decorators.python.python_task
       outlets: []
-      params: {}
       priority_weight: 1
-      python_callable: airflow_kinesis_analytics.delete_connection
+      python_callable: example_kinesis_analytics_taskflow.delete_connection
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: delete_connection
       trigger_rule: all_done
       wait_for_downstream: false
-      dependencies: [copy_jar_file]
-      decorator: airflow.decorators.task
+      multiple_outputs: false
+      dependencies:
+      - copy_jar_file
       conn_id: test-git
     delete_application:
+      decorator: airflow.providers.standard.decorators.python.python_task
       outlets: []
-      params: {}
       priority_weight: 1
-      python_callable: airflow_kinesis_analytics.delete_application
+      python_callable: example_kinesis_analytics_taskflow.delete_application
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: delete_application
       trigger_rule: all_done
       wait_for_downstream: false
-      dependencies: [await_stop_application]
-      decorator: airflow.decorators.task
+      multiple_outputs: false
+      dependencies:
+      - await_stop_application
       app_name: test-test-app
     delete_kinesis_stream:
+      decorator: airflow.providers.standard.decorators.python.python_task
       outlets: []
-      params: {}
       priority_weight: 1
-      python_callable: airflow_kinesis_analytics.delete_kinesis_stream
+      python_callable: example_kinesis_analytics_taskflow.delete_kinesis_stream
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: delete_kinesis_stream
       trigger_rule: all_done
       wait_for_downstream: false
-      dependencies: [delete_application]
-      decorator: airflow.decorators.task
+      multiple_outputs: false
+      dependencies:
+      - delete_application
       stream: test-test-stream
       region: us-east-1
+  catchup: false
+  dag_display_name: example_kinesis_analytics
+  owner_links: {}
+  start_date:
+    __type__: datetime.datetime
+    year: 2026
+    month: 1
+    day: 1
+  tags: []

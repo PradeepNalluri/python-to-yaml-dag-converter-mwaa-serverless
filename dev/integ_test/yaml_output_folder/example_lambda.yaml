@@ -2,7 +2,11 @@ example_lambda:
   dag_id: example_lambda
   params: {}
   default_args:
-    start_date: '2026-01-01'
+    start_date:
+      __type__: datetime.datetime
+      year: 2026
+      month: 1
+      day: 1
   schedule: '@once'
   tasks:
     create_lambda_function:
@@ -18,13 +22,19 @@ example_lambda:
       function_name: test-function
       handler: lambda_function.test
       outlets: []
-      params: {}
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
       role: test-role-arn
       runtime: python3.9
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: create_lambda_function
       trigger_rule: all_success
       wait_for_completion: false
@@ -38,45 +48,77 @@ example_lambda:
       function_name: test-function
       mode: poke
       outlets: []
-      params: {}
       poke_interval: 1
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
-      target_states: [Active]
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
+      target_states:
+      - Active
       task_id: wait_lambda_function_state
       timeout: 604800.0
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [create_lambda_function]
+      dependencies:
+      - create_lambda_function
     invoke_lambda_function:
       operator: airflow.providers.amazon.aws.operators.lambda_function.LambdaInvokeFunctionOperator
       aws_conn_id: aws_default
       function_name: test-function
       keep_empty_log_lines: true
       outlets: []
-      params: {}
       payload: '{"SampleEvent": {"SampleData": {"Name": "XYZ", "DoB": "1993-01-01"}}}'
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: invoke_lambda_function
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [wait_lambda_function_state]
+      dependencies:
+      - wait_lambda_function_state
     delete_lambda:
+      decorator: airflow.providers.standard.decorators.python.python_task
       outlets: []
-      params: {}
       priority_weight: 1
-      python_callable: airflow_lambda.delete_lambda
+      python_callable: example_lambda_taskflow.delete_lambda
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: delete_lambda
       trigger_rule: all_done
       wait_for_downstream: false
-      dependencies: [invoke_lambda_function]
-      decorator: airflow.decorators.task
+      multiple_outputs: false
+      dependencies:
+      - invoke_lambda_function
       function_name: test-function
+  catchup: false
+  dag_display_name: example_lambda
+  owner_links: {}
+  start_date:
+    __type__: datetime.datetime
+    year: 2026
+    month: 1
+    day: 1
+  tags: []

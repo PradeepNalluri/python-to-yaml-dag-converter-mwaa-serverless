@@ -2,7 +2,11 @@ example_glue_data_quality:
   dag_id: example_glue_data_quality
   params: {}
   default_args:
-    start_date: '2026-01-01'
+    start_date:
+      __type__: datetime.datetime
+      year: 2026
+      month: 1
+      day: 1
   schedule: '@once'
   tasks:
     create_s3_bucket:
@@ -10,11 +14,17 @@ example_glue_data_quality:
       aws_conn_id: aws_default
       bucket_name: test-glue-dq-athena-bucket
       outlets: []
-      params: {}
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: create_s3_bucket
       trigger_rule: all_success
       wait_for_downstream: false
@@ -28,18 +38,25 @@ example_glue_data_quality:
             "Charlie",30
       encrypt: false
       outlets: []
-      params: {}
       priority_weight: 1
       replace: true
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
       s3_bucket: test-glue-dq-athena-bucket
       s3_key: test_test_glue_dq_table/airflow_sample.csv
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: upload_sample_data
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [create_s3_bucket]
+      dependencies:
+      - create_s3_bucket
     create_database:
       operator: airflow.providers.amazon.aws.operators.athena.AthenaOperator
       aws_conn_id: aws_default
@@ -50,20 +67,27 @@ example_glue_data_quality:
       max_polling_attempts: 999999
       outlets: []
       output_location: s3://test-glue-dq-athena-bucket/
-      params: {}
       priority_weight: 1
       query: CREATE DATABASE IF NOT EXISTS test_glue_dq_default
       query_execution_context: {}
       result_configuration: {}
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
       sleep_time: 1
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: create_database
       trigger_rule: all_success
       wait_for_downstream: false
       workgroup: primary
-      dependencies: [upload_sample_data]
+      dependencies:
+      - upload_sample_data
     create_table:
       operator: airflow.providers.amazon.aws.operators.athena.AthenaOperator
       aws_conn_id: aws_default
@@ -74,7 +98,6 @@ example_glue_data_quality:
       max_polling_attempts: 999999
       outlets: []
       output_location: s3://test-glue-dq-athena-bucket/
-      params: {}
       priority_weight: 1
       query: "CREATE EXTERNAL TABLE IF NOT EXISTS test_glue_dq_default.test_test_glue_dq_table\n\
         \            ( `name` string, `age` int )\n            ROW FORMAT SERDE \"\
@@ -86,14 +109,22 @@ example_glue_data_quality:
       query_execution_context: {}
       result_configuration: {}
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
       sleep_time: 1
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: create_table
       trigger_rule: all_success
       wait_for_downstream: false
       workgroup: primary
-      dependencies: [create_database]
+      dependencies:
+      - create_database
     drop_table:
       operator: airflow.providers.amazon.aws.operators.athena.AthenaOperator
       aws_conn_id: aws_default
@@ -104,20 +135,27 @@ example_glue_data_quality:
       max_polling_attempts: 999999
       outlets: []
       output_location: s3://test-glue-dq-athena-bucket/
-      params: {}
       priority_weight: 1
       query: DROP TABLE IF EXISTS test_glue_dq_default.test_test_glue_dq_table
       query_execution_context: {}
       result_configuration: {}
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
       sleep_time: 1
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: drop_table
       trigger_rule: all_done
       wait_for_downstream: false
       workgroup: primary
-      dependencies: [delete_ruleset]
+      dependencies:
+      - delete_ruleset
     drop_database:
       operator: airflow.providers.amazon.aws.operators.athena.AthenaOperator
       aws_conn_id: aws_default
@@ -128,35 +166,49 @@ example_glue_data_quality:
       max_polling_attempts: 999999
       outlets: []
       output_location: s3://test-glue-dq-athena-bucket/
-      params: {}
       priority_weight: 1
       query: DROP DATABASE IF EXISTS test_glue_dq_default
       query_execution_context: {}
       result_configuration: {}
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
       sleep_time: 1
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: drop_database
       trigger_rule: all_done
       wait_for_downstream: false
       workgroup: primary
-      dependencies: [drop_table]
+      dependencies:
+      - drop_table
     delete_s3_bucket:
       operator: airflow.providers.amazon.aws.operators.s3.S3DeleteBucketOperator
       aws_conn_id: aws_default
       bucket_name: test-glue-dq-athena-bucket
       force_delete: true
       outlets: []
-      params: {}
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: delete_s3_bucket
       trigger_rule: all_done
       wait_for_downstream: false
-      dependencies: [drop_database]
+      dependencies:
+      - drop_database
     create_rule_set:
       operator: airflow.providers.amazon.aws.operators.glue.GlueDataQualityOperator
       aws_conn_id: aws_default
@@ -167,10 +219,11 @@ example_glue_data_quality:
       description: AWS Glue Data Quality Rule Set With Airflow
       name: test-system-test-ruleset
       outlets: []
-      params: {}
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
       ruleset: |2
 
@@ -181,11 +234,17 @@ example_glue_data_quality:
             ColumnLength "name" between 3 and 14,
             ColumnValues "age" between 19 and 31
         ]
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: create_rule_set
       trigger_rule: all_success
       update_rule_set: false
       wait_for_downstream: false
-      dependencies: [create_table]
+      dependencies:
+      - create_table
     start_evaluation_run:
       operator: airflow.providers.amazon.aws.operators.glue.GlueDataQualityRuleSetEvaluationRunOperator
       aws_conn_id: aws_default
@@ -196,15 +255,22 @@ example_glue_data_quality:
       deferrable: false
       number_of_workers: 5
       outlets: []
-      params: {}
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
       role: test-role-arn
       rule_set_evaluation_run_kwargs: {}
-      rule_set_names: [test-system-test-ruleset]
+      rule_set_names:
+      - test-system-test-ruleset
       show_results: true
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: start_evaluation_run
       timeout: 2880
       trigger_rule: all_success
@@ -213,40 +279,65 @@ example_glue_data_quality:
       wait_for_downstream: false
       waiter_delay: 60
       waiter_max_attempts: 20
-      dependencies: [create_rule_set]
+      dependencies:
+      - create_rule_set
     await_evaluation_run_sensor:
       operator: airflow.providers.amazon.aws.sensors.glue.GlueDataQualityRuleSetEvaluationRunSensor
       aws_conn_id: aws_default
       deferrable: false
-      evaluation_run_id: '{{ task_instance.xcom_pull(task_ids=''start_evaluation_run'',
-        key=''return_value'') }}'
+      evaluation_run_id: "{{ task_instance.xcom_pull(task_ids='start_evaluation_run',\
+        \ key='return_value') }}"
       max_retries: 60
       mode: poke
       outlets: []
-      params: {}
       poke_interval: 120
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
       show_results: true
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: await_evaluation_run_sensor
       timeout: 604800.0
       trigger_rule: all_success
       verify_result_status: true
       wait_for_downstream: false
-      dependencies: [start_evaluation_run]
+      dependencies:
+      - start_evaluation_run
     delete_ruleset:
+      decorator: airflow.providers.standard.decorators.python.python_task
       outlets: []
-      params: {}
       priority_weight: 1
-      python_callable: airflow_glue_data_quality.delete_ruleset
+      python_callable: example_glue_data_quality_taskflow.delete_ruleset
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: delete_ruleset
       trigger_rule: all_done
       wait_for_downstream: false
-      dependencies: [await_evaluation_run_sensor]
-      decorator: airflow.decorators.task
+      multiple_outputs: false
+      dependencies:
+      - await_evaluation_run_sensor
       ruleset_name: test-system-test-ruleset
+  catchup: false
+  dag_display_name: example_glue_data_quality
+  owner_links: {}
+  start_date:
+    __type__: datetime.datetime
+    year: 2026
+    month: 1
+    day: 1
+  tags: []

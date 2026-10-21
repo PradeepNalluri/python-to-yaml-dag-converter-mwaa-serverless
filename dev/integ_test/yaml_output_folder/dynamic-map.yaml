@@ -9,13 +9,11 @@ dynamic-map:
       day: 2
   schedule: '@daily'
   tasks:
-    test:
-      operator: airflow.providers.standard.operators.python.PythonOperator
-      op_args: []
-      op_kwargs: {}
+    add_one:
+      decorator: airflow.providers.standard.decorators.python.python_task
       outlets: []
       priority_weight: 1
-      python_callable: xcom_indexing.testing
+      python_callable: dynamic_map_taskflow.add_one
       retries: 0
       retry_delay:
         __type__: datetime.timedelta
@@ -26,17 +24,21 @@ dynamic-map:
         year: 2026
         month: 4
         day: 2
-      task_id: test
+      task_id: add_one
       trigger_rule: all_success
       wait_for_downstream: false
       dependencies: []
-    test1:
-      operator: airflow.providers.standard.operators.python.PythonOperator
-      op_args: []
-      op_kwargs: {}
+      expand:
+        x:
+        - 1
+        - 2
+        - 3
+      partial: {}
+    add_one__1:
+      decorator: airflow.providers.standard.decorators.python.python_task
       outlets: []
       priority_weight: 1
-      python_callable: xcom_indexing.testing
+      python_callable: dynamic_map_taskflow.add_one
       retries: 0
       retry_delay:
         __type__: datetime.timedelta
@@ -47,35 +49,14 @@ dynamic-map:
         year: 2026
         month: 4
         day: 2
-      task_id: test1
-      trigger_rule: all_success
-      wait_for_downstream: false
-      dependencies: []
-    total:
-      operator: airflow.providers.standard.operators.python.PythonOperator
-      op_args: []
-      op_kwargs:
-        str1: "{{ task_instance.xcom_pull(task_ids='test', key='hi') }}"
-        str2: "{{ task_instance.xcom_pull(task_ids='test1', key='hi') }}"
-      outlets: []
-      priority_weight: 1
-      python_callable: xcom_indexing.total_func
-      retries: 0
-      retry_delay:
-        __type__: datetime.timedelta
-        seconds: 300.0
-      retry_exponential_backoff: false
-      start_date:
-        __type__: datetime.datetime
-        year: 2026
-        month: 4
-        day: 2
-      task_id: total
+      task_id: add_one__1
       trigger_rule: all_success
       wait_for_downstream: false
       dependencies:
-      - test1
-      - test
+      - add_one
+      expand:
+        x: +add_one
+      partial: {}
   catchup: false
   dag_display_name: dynamic-map
   owner_links: {}

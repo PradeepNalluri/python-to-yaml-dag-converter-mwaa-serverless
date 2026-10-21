@@ -2,7 +2,11 @@ example_datasync:
   dag_id: example_datasync
   params: {}
   default_args:
-    start_date: '2026-01-01'
+    start_date:
+      __type__: datetime.datetime
+      year: 2026
+      month: 1
+      day: 1
   schedule: '@once'
   tasks:
     create_s3_bucket_source:
@@ -10,11 +14,17 @@ example_datasync:
       aws_conn_id: aws_default
       bucket_name: test-datasync-bucket-source
       outlets: []
-      params: {}
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: create_s3_bucket_source
       trigger_rule: all_success
       wait_for_downstream: false
@@ -24,58 +34,89 @@ example_datasync:
       aws_conn_id: aws_default
       bucket_name: test-datasync-bucket-destination
       outlets: []
-      params: {}
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: create_s3_bucket_destination
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [create_s3_bucket_source]
+      dependencies:
+      - create_s3_bucket_source
     create_source_location:
+      decorator: airflow.providers.standard.decorators.python.python_task
       outlets: []
-      params: {}
       priority_weight: 1
-      python_callable: airflow_datasync.create_source_location
+      python_callable: example_datasync_taskflow.create_source_location
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: create_source_location
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [create_s3_bucket_destination]
-      decorator: airflow.decorators.task
+      multiple_outputs: false
+      dependencies:
+      - create_s3_bucket_destination
       bucket_source: test-datasync-bucket-source
       role_arn: test
     create_destination_location:
+      decorator: airflow.providers.standard.decorators.python.python_task
       outlets: []
-      params: {}
       priority_weight: 1
-      python_callable: airflow_datasync.create_destination_location
+      python_callable: example_datasync_taskflow.create_destination_location
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: create_destination_location
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [create_source_location]
-      decorator: airflow.decorators.task
+      multiple_outputs: false
+      dependencies:
+      - create_source_location
       bucket_destination: test-datasync-bucket-destination
       role_arn: test
     create_task:
+      decorator: airflow.providers.standard.decorators.python.python_task
       outlets: []
-      params: {}
       priority_weight: 1
-      python_callable: airflow_datasync.create_task
+      python_callable: example_datasync_taskflow.create_task
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: create_task
       trigger_rule: all_success
       wait_for_downstream: false
-      dependencies: [create_destination_location]
-      decorator: airflow.decorators.task
+      multiple_outputs: false
+      dependencies:
+      - create_destination_location
     execute_task_by_arn:
       operator: airflow.providers.amazon.aws.operators.datasync.DataSyncOperator
       allow_random_location_choice: false
@@ -87,13 +128,19 @@ example_datasync:
       delete_task_after_execution: false
       max_iterations: 60
       outlets: []
-      params: {}
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
-      task_arn: '{{ task_instance.xcom_pull(task_ids=''create_task'', key=''return_value'')
-        }}'
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
+      task_arn: "{{ task_instance.xcom_pull(task_ids='create_task', key='return_value')\
+        \ }}"
       task_execution_kwargs: {}
       task_id: execute_task_by_arn
       trigger_rule: all_success
@@ -101,7 +148,8 @@ example_datasync:
       wait_for_completion: false
       wait_for_downstream: false
       wait_interval_seconds: 30
-      dependencies: [create_task]
+      dependencies:
+      - create_task
     execute_task_by_locations:
       operator: airflow.providers.amazon.aws.operators.datasync.DataSyncOperator
       allow_random_location_choice: false
@@ -114,21 +162,30 @@ example_datasync:
       destination_location_uri: s3://test-datasync-bucket-destination/test
       max_iterations: 60
       outlets: []
-      params: {}
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
       source_location_uri: s3://test-datasync-bucket-source/test
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_execution_kwargs:
-        Includes: [{FilterType: SIMPLE_PATTERN, Value: /test/subdir}]
+        Includes:
+        - FilterType: SIMPLE_PATTERN
+          Value: /test/subdir
       task_id: execute_task_by_locations
       trigger_rule: all_success
       update_task_kwargs: {}
       wait_for_completion: false
       wait_for_downstream: false
       wait_interval_seconds: 30
-      dependencies: [execute_task_by_arn]
+      dependencies:
+      - execute_task_by_arn
     create_and_execute_task:
       operator: airflow.providers.amazon.aws.operators.datasync.DataSyncOperator
       allow_random_location_choice: false
@@ -150,12 +207,18 @@ example_datasync:
       destination_location_uri: s3://test-datasync-bucket-destination/test_create
       max_iterations: 60
       outlets: []
-      params: {}
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
       source_location_uri: s3://test-datasync-bucket-source/test_create
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_execution_kwargs: {}
       task_id: create_and_execute_task
       trigger_rule: all_success
@@ -163,35 +226,52 @@ example_datasync:
       wait_for_completion: false
       wait_for_downstream: false
       wait_interval_seconds: 30
-      dependencies: [execute_task_by_locations]
+      dependencies:
+      - execute_task_by_locations
     list_locations:
+      decorator: airflow.providers.standard.decorators.python.python_task
       outlets: []
-      params: {}
       priority_weight: 1
-      python_callable: airflow_datasync.list_locations
+      python_callable: example_datasync_taskflow.list_locations
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: list_locations
       trigger_rule: all_done
       wait_for_downstream: false
-      dependencies: [delete_task_created_by_operator]
-      decorator: airflow.decorators.task
+      multiple_outputs: false
+      dependencies:
+      - delete_task_created_by_operator
       bucket_source: test-datasync-bucket-source
       bucket_destination: test-datasync-bucket-destination
     delete_locations:
+      decorator: airflow.providers.standard.decorators.python.python_task
       outlets: []
-      params: {}
       priority_weight: 1
-      python_callable: airflow_datasync.delete_locations
+      python_callable: example_datasync_taskflow.delete_locations
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: delete_locations
       trigger_rule: all_done
       wait_for_downstream: false
-      dependencies: [list_locations]
-      decorator: airflow.decorators.task
+      multiple_outputs: false
+      dependencies:
+      - list_locations
       locations: +list_locations
     delete_s3_bucket_source:
       operator: airflow.providers.amazon.aws.operators.s3.S3DeleteBucketOperator
@@ -199,54 +279,94 @@ example_datasync:
       bucket_name: test-datasync-bucket-source
       force_delete: true
       outlets: []
-      params: {}
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: delete_s3_bucket_source
       trigger_rule: all_done
       wait_for_downstream: false
-      dependencies: [delete_locations]
+      dependencies:
+      - delete_locations
     delete_s3_bucket_destination:
       operator: airflow.providers.amazon.aws.operators.s3.S3DeleteBucketOperator
       aws_conn_id: aws_default
       bucket_name: test-datasync-bucket-destination
       force_delete: true
       outlets: []
-      params: {}
       priority_weight: 1
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: delete_s3_bucket_destination
       trigger_rule: all_done
       wait_for_downstream: false
-      dependencies: [delete_s3_bucket_source]
+      dependencies:
+      - delete_s3_bucket_source
     delete_task:
+      decorator: airflow.providers.standard.decorators.python.python_task
       outlets: []
-      params: {}
       priority_weight: 1
-      python_callable: airflow_datasync.delete_task
+      python_callable: example_datasync_taskflow.delete_task
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: delete_task
       trigger_rule: all_done
       wait_for_downstream: false
-      dependencies: [create_task, create_and_execute_task]
-      decorator: airflow.decorators.task
+      multiple_outputs: false
+      dependencies:
+      - create_task
+      - create_and_execute_task
       task_arn: +create_task
     delete_task_created_by_operator:
+      decorator: airflow.providers.standard.decorators.python.python_task
       outlets: []
-      params: {}
       priority_weight: 1
-      python_callable: airflow_datasync.delete_task_created_by_operator
+      python_callable: example_datasync_taskflow.delete_task_created_by_operator
       retries: 0
-      retry_delay: 300.0
+      retry_delay:
+        __type__: datetime.timedelta
+        seconds: 300.0
       retry_exponential_backoff: false
+      start_date:
+        __type__: datetime.datetime
+        year: 2026
+        month: 1
+        day: 1
       task_id: delete_task_created_by_operator
       trigger_rule: all_done
       wait_for_downstream: false
-      dependencies: [delete_task]
-      decorator: airflow.decorators.task
+      multiple_outputs: false
+      dependencies:
+      - delete_task
+  catchup: false
+  dag_display_name: example_datasync
+  owner_links: {}
+  start_date:
+    __type__: datetime.datetime
+    year: 2026
+    month: 1
+    day: 1
+  tags: []
