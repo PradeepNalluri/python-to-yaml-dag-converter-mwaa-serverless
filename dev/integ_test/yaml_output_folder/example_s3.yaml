@@ -2,49 +2,31 @@ example_s3:
   dag_id: example_s3
   params: {}
   default_args:
+    owner: airflow
     start_date:
       __type__: datetime.datetime
       year: 2026
-      month: 1
-      day: 1
-  schedule: '@once'
+      month: 7
+      day: 6
+    retries: 1
+  schedule: '@daily'
   tasks:
     create_bucket:
       operator: airflow.providers.amazon.aws.operators.s3.S3CreateBucketOperator
       task_id: create_bucket
-      bucket_name: test-s3-bucket
+      bucket_name: py2yml-my-personal-test-s3-bucket
       dependencies: []
     create_bucket_2:
       operator: airflow.providers.amazon.aws.operators.s3.S3CreateBucketOperator
       task_id: create_bucket_2
-      bucket_name: test-s3-bucket-2
+      bucket_name: py2yml-my-personal-test-s3-bucket-v2
       dependencies:
       - create_bucket
-    put_tagging:
-      operator: airflow.providers.amazon.aws.operators.s3.S3PutBucketTaggingOperator
-      task_id: put_tagging
-      bucket_name: test-s3-bucket
-      key: test-s3-bucket-tagging-key
-      value: test-s3-bucket-tagging-value
-      dependencies:
-      - create_bucket_2
-    get_tagging:
-      operator: airflow.providers.amazon.aws.operators.s3.S3GetBucketTaggingOperator
-      task_id: get_tagging
-      bucket_name: test-s3-bucket
-      dependencies:
-      - put_tagging
-    delete_tagging:
-      operator: airflow.providers.amazon.aws.operators.s3.S3DeleteBucketTaggingOperator
-      task_id: delete_tagging
-      bucket_name: test-s3-bucket
-      dependencies:
-      - get_tagging
     create_object:
       operator: airflow.providers.amazon.aws.operators.s3.S3CreateObjectOperator
       task_id: create_object
-      s3_bucket: test-s3-bucket
-      s3_key: test-key
+      s3_bucket: py2yml-my-personal-test-s3-bucket
+      s3_key: py2yml-key
       data: |2
 
             apple,0.5
@@ -52,12 +34,12 @@ example_s3:
             bread,4.0
       replace: true
       dependencies:
-      - delete_tagging
+      - create_bucket_2
     create_object_2:
       operator: airflow.providers.amazon.aws.operators.s3.S3CreateObjectOperator
       task_id: create_object_2
-      s3_bucket: test-s3-bucket
-      s3_key: test-key2
+      s3_bucket: py2yml-my-personal-test-s3-bucket
+      s3_key: py2yml-key-v2
       data: |2
 
             apple,0.5
@@ -66,131 +48,25 @@ example_s3:
       replace: true
       dependencies:
       - create_object
-    list_prefixes:
-      operator: airflow.providers.amazon.aws.operators.s3.S3ListPrefixesOperator
-      task_id: list_prefixes
-      bucket: test-s3-bucket
-      prefix: ''
-      delimiter: /
-      dependencies:
-      - create_object_2
     list_keys:
       operator: airflow.providers.amazon.aws.operators.s3.S3ListOperator
       task_id: list_keys
-      bucket: test-s3-bucket
+      bucket: py2yml-my-personal-test-s3-bucket
       prefix: ''
       dependencies:
-      - list_prefixes
-    sensor_one_key:
-      operator: airflow.providers.amazon.aws.sensors.s3.S3KeySensor
-      task_id: sensor_one_key
-      bucket_name: test-s3-bucket
-      bucket_key: test-key
-      dependencies:
-      - list_keys
-    sensor_two_keys:
-      operator: airflow.providers.amazon.aws.sensors.s3.S3KeySensor
-      task_id: sensor_two_keys
-      bucket_name: test-s3-bucket
-      bucket_key:
-      - test-key
-      - test-key2
-      dependencies:
-      - list_keys
-    sensor_one_key_deferrable:
-      operator: airflow.providers.amazon.aws.sensors.s3.S3KeySensor
-      task_id: sensor_one_key_deferrable
-      bucket_name: test-s3-bucket
-      bucket_key: test-key
-      deferrable: true
-      dependencies:
-      - sensor_one_key
-    sensor_two_keys_deferrable:
-      operator: airflow.providers.amazon.aws.sensors.s3.S3KeySensor
-      task_id: sensor_two_keys_deferrable
-      bucket_name: test-s3-bucket
-      bucket_key:
-      - test-key
-      - test-key2
-      deferrable: true
-      dependencies:
-      - sensor_two_keys
-    sensor_key_with_function_deferrable:
-      operator: airflow.providers.amazon.aws.sensors.s3.S3KeySensor
-      task_id: sensor_key_with_function_deferrable
-      bucket_name: test-s3-bucket
-      bucket_key: test-key
-      check_fn: airflow_s3.check_fn
-      deferrable: true
-      dependencies:
-      - sensor_key_with_function
-    sensor_key_with_regex_deferrable:
-      operator: airflow.providers.amazon.aws.sensors.s3.S3KeySensor
-      task_id: sensor_key_with_regex_deferrable
-      bucket_name: test-s3-bucket
-      bucket_key: .*-key
-      use_regex: true
-      deferrable: true
-      dependencies:
-      - sensor_key_with_regex
-    sensor_key_with_function:
-      operator: airflow.providers.amazon.aws.sensors.s3.S3KeySensor
-      task_id: sensor_key_with_function
-      bucket_name: test-s3-bucket
-      bucket_key: test-key
-      check_fn: airflow_s3.check_fn
-      dependencies:
-      - list_keys
-    sensor_key_with_regex:
-      operator: airflow.providers.amazon.aws.sensors.s3.S3KeySensor
-      task_id: sensor_key_with_regex
-      bucket_name: test-s3-bucket
-      bucket_key: .*-key
-      use_regex: true
-      dependencies:
-      - list_keys
-    copy_object:
-      operator: airflow.providers.amazon.aws.operators.s3.S3CopyObjectOperator
-      task_id: copy_object
-      source_bucket_name: test-s3-bucket
-      dest_bucket_name: test-s3-bucket-2
-      source_bucket_key: test-key
-      dest_bucket_key: test-key2
-      dependencies:
-      - sensor_key_with_regex_deferrable
-      - sensor_key_with_function_deferrable
-      - sensor_one_key_deferrable
-      - sensor_two_keys_deferrable
-    sensor_keys_unchanged:
-      operator: airflow.providers.amazon.aws.sensors.s3.S3KeysUnchangedSensor
-      task_id: sensor_keys_unchanged
-      bucket_name: test-s3-bucket-2
-      prefix: ''
-      inactivity_period: 10
-      dependencies:
-      - copy_object
-    delete_objects:
-      operator: airflow.providers.amazon.aws.operators.s3.S3DeleteObjectsOperator
-      task_id: delete_objects
-      bucket: test-s3-bucket-2
-      keys: test-key2
-      trigger_rule: all_done
-      dependencies:
-      - sensor_keys_unchanged
+      - create_object_2
     delete_bucket:
       operator: airflow.providers.amazon.aws.operators.s3.S3DeleteBucketOperator
       task_id: delete_bucket
-      bucket_name: test-s3-bucket
+      bucket_name: py2yml-my-personal-test-s3-bucket
       force_delete: true
-      trigger_rule: all_done
       dependencies:
-      - delete_objects
+      - list_keys
     delete_bucket_2:
       operator: airflow.providers.amazon.aws.operators.s3.S3DeleteBucketOperator
       task_id: delete_bucket_2
-      bucket_name: test-s3-bucket-2
+      bucket_name: py2yml-my-personal-test-s3-bucket-v2
       force_delete: true
-      trigger_rule: all_done
       dependencies:
       - delete_bucket
   catchup: false
@@ -198,6 +74,6 @@ example_s3:
   start_date:
     __type__: datetime.datetime
     year: 2026
-    month: 1
-    day: 1
+    month: 7
+    day: 6
   tags: []

@@ -48,8 +48,8 @@ dynamic_dag_sales:
       task_id: end
       bash_command: "echo 'Completed processing for sales'"
       dependencies:
-      - process_customers
       - process_transactions
+      - process_customers
       - process_products
   catchup: false
   dag_display_name: dynamic_dag_sales

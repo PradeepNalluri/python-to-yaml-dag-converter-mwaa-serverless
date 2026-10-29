@@ -153,8 +153,8 @@ example_redshift:
       cluster_identifier: test-redshift-cluster
       snapshot_identifier: test-snapshot
       dependencies:
-      - insert_data_reuse_session
       - insert_data
+      - insert_data_reuse_session
   catchup: false
   dag_display_name: example_redshift
   start_date:
