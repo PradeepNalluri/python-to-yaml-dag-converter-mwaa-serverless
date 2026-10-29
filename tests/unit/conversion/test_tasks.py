@@ -1,7 +1,6 @@
 import unittest
 from unittest.mock import Mock, patch
 
-from airflow.providers.standard.decorators.python import _PythonDecoratedOperator
 from airflow.sdk.definitions.mappedoperator import MappedOperator
 
 from dag_converter.conversion.tasks import convert_tasks, get_operator_parameters
@@ -14,10 +13,8 @@ class TestConvertTasks(unittest.TestCase):
         self.mock_dag_object = Mock()
         self.mock_dag_object.params = {}
 
-    @patch("dag_converter.conversion.tasks.get_cleanup_dag")
-    @patch("dag_converter.conversion.tasks.handle_python_decorator")
     @patch("dag_converter.conversion.tasks.get_operator_parameters")
-    def test_basic_task_conversion(self, mock_get_params, mock_handle_python, mock_cleanup):
+    def test_basic_task_conversion(self, mock_get_params):
         """Test basic task conversion"""
         # Setup mocks
         mock_get_params.return_value = ["param1", "retries"]
@@ -52,43 +49,10 @@ class TestConvertTasks(unittest.TestCase):
         }
         self.assertEqual(result, expected)
 
-    @unittest.skip("Python operators not supported")
-    @patch("dag_converter.conversion.tasks.get_cleanup_dag")
-    @patch("dag_converter.conversion.tasks.handle_python_decorator")
-    @patch("dag_converter.conversion.tasks.get_operator_parameters")
-    def test_python_decorated_operator(self, mock_get_params, mock_handle_python, mock_cleanup):
-        """Test Python decorated operator handling"""
-        mock_get_params.return_value = ["python_callable"]
-        mock_cleanup.return_value = {
-            "operator": "airflow.decorators.python._PythonDecoratedOperator",
-            "python_callable": "test.func",
-            "dependencies": [],
-        }
-        self.mock_validator.validate_field.return_value = True
-
-        task = Mock(spec=_PythonDecoratedOperator)
-        task.task_id = "python_task"
-        task.task_type = "_PythonDecoratedOperator"
-        task.__module__ = "airflow.decorators.python"
-        task.upstream_task_ids = []
-        task._is_mapped = False
-        task.python_callable = "func"
-        task._BaseOperator__init_kwargs = {}
-        del task._task_module
-
-        with patch("builtins.dir", return_value=["task_id", "task_type", "python_callable"]):
-            self.mock_dag_object.tasks = [task]
-
-            convert_tasks(self.mock_taskflow_parser, self.mock_dag_object, "test.py", self.mock_validator)
-
-        mock_cleanup.assert_called()
-        mock_handle_python.assert_called()
-
-    @patch("dag_converter.conversion.tasks.get_cleanup_dag")
-    @patch("dag_converter.conversion.tasks.handle_python_decorator")
+    @patch("dag_converter.conversion.tasks.get_operator_defaults", return_value={})
     @patch("dag_converter.conversion.tasks.handle_dynamic_task_mapping")
     @patch("dag_converter.conversion.tasks.get_operator_parameters")
-    def test_dynamic_task_mapping(self, mock_get_params, mock_handle_dtm, mock_handle_python, mock_cleanup):
+    def test_dynamic_task_mapping(self, mock_get_params, mock_handle_dtm, mock_defaults):
         """Test dynamic task mapping handling"""
         mock_get_params.return_value = ["param1"]
         self.mock_validator.validate_field.return_value = True
@@ -96,7 +60,7 @@ class TestConvertTasks(unittest.TestCase):
         task = Mock(spec=MappedOperator)
         task.task_id = "mapped_task"
         task.task_type = "BashOperator"
-        task.__module__ = "airflow.operators.bash"
+        task._task_module = "airflow.operators.bash"
         task.upstream_task_ids = []
         task._is_mapped = True
         task.param1 = "value1"
@@ -109,10 +73,9 @@ class TestConvertTasks(unittest.TestCase):
 
         mock_handle_dtm.assert_called()
 
-    @patch("dag_converter.conversion.tasks.get_cleanup_dag")
-    @patch("dag_converter.conversion.tasks.handle_python_decorator")
+    @patch("dag_converter.conversion.tasks.get_operator_defaults", return_value={})
     @patch("dag_converter.conversion.tasks.get_operator_parameters")
-    def test_task_module_handling(self, mock_get_params, mock_handle_python, mock_cleanup):
+    def test_task_module_handling(self, mock_get_params, mock_defaults):
         """Test _task_module attribute handling"""
         mock_get_params.return_value = ["param1"]
         self.mock_validator.validate_field.return_value = True
@@ -136,10 +99,8 @@ class TestConvertTasks(unittest.TestCase):
 
         self.assertEqual(result["dtm_task"]["operator"], "airflow.operators.bash.BashOperator")
 
-    @patch("dag_converter.conversion.tasks.get_cleanup_dag")
-    @patch("dag_converter.conversion.tasks.handle_python_decorator")
     @patch("dag_converter.conversion.tasks.get_operator_parameters")
-    def test_special_operator_cleanup(self, mock_get_params, mock_handle_python, mock_cleanup):
+    def test_special_operator_cleanup(self, mock_get_params):
         """Test special operator field cleanup"""
         mock_get_params.return_value = ["flow_update", "config"]
 
@@ -156,7 +117,7 @@ class TestConvertTasks(unittest.TestCase):
         task1.upstream_task_ids = []
         task1._is_mapped = False
         task1.flow_update = "update"
-        task1._BaseOperator__init_kwargs = {}
+        task1._BaseOperator__init_kwargs = {"flow_update": "update"}
         del task1._task_module
 
         # Test SageMaker operator
@@ -167,7 +128,7 @@ class TestConvertTasks(unittest.TestCase):
         task2.upstream_task_ids = []
         task2._is_mapped = False
         task2.config = "config"
-        task2._BaseOperator__init_kwargs = {}
+        task2._BaseOperator__init_kwargs = {"config": "config"}
         del task2._task_module
 
         with patch("builtins.dir", return_value=["task_id", "task_type", "flow_update", "config"]):
@@ -180,10 +141,8 @@ class TestConvertTasks(unittest.TestCase):
         # config should be removed from sagemaker task
         self.assertNotIn("config", result["sagemaker_task"])
 
-    @patch("dag_converter.conversion.tasks.get_cleanup_dag")
-    @patch("dag_converter.conversion.tasks.handle_python_decorator")
     @patch("dag_converter.conversion.tasks.get_operator_parameters")
-    def test_skip_dtm_keywords(self, mock_get_params, mock_handle_python, mock_cleanup):
+    def test_skip_dtm_keywords(self, mock_get_params):
         """Test skipping DTM keywords"""
         mock_get_params.return_value = ["op_kwargs_expand_input", "expand_input", "partial_kwargs", "param1"]
         self.mock_validator.validate_field.return_value = True
@@ -198,7 +157,7 @@ class TestConvertTasks(unittest.TestCase):
         task.expand_input = "expand"
         task.partial_kwargs = "partial"
         task.param1 = "value1"
-        task._BaseOperator__init_kwargs = {}
+        task._BaseOperator__init_kwargs = {"param1": "value1"}
 
         with patch(
             "builtins.dir",
@@ -306,7 +265,7 @@ class TestGetOperatorParameters(unittest.TestCase):
         task.upstream_task_ids = []
         task._is_mapped = False
         task.params = {"s3_bucket": "different-bucket", "custom_param": "value"}
-        task._BaseOperator__init_kwargs = {}
+        task._BaseOperator__init_kwargs = {"params": {"s3_bucket": "different-bucket", "custom_param": "value"}}
         del task._task_module
         
         with patch("builtins.dir", return_value=["task_id", "params"]):
@@ -397,7 +356,7 @@ class TestGetOperatorParameters(unittest.TestCase):
         task.upstream_task_ids = []
         task._is_mapped = False
         task.params = {"s3_bucket": "task-bucket"}
-        task._BaseOperator__init_kwargs = {}
+        task._BaseOperator__init_kwargs = {"params": {"s3_bucket": "task-bucket"}}
         del task._task_module
         
         with patch("builtins.dir", return_value=["task_id", "params"]):

@@ -41,6 +41,9 @@ Review the converted Dags in the `output_yaml` folder in the current directory
 * Operators outside the verified list in `validator_schema.yaml` are converted with a warning. Their provider packages must be installed where the converter runs
 * Behavior that is not supported in `dag-factory` will not be converted
 * Dynamic task mapping conversion is not supported
+* Operators and argument classes must be importable where the YAML Dag runs. Classes defined in the Dag file are rejected
+* `expand_kwargs`, `functools.partial` values, more than one callback per callback argument, and objects other than enums, dataclasses and datetime values are rejected
+* PythonOperator, BranchPythonOperator and PythonSensor subclasses that set `python_callable` themselves are rejected, because `dag-factory` requires `python_callable` in the YAML
 
 ## Examples
 * See supported [examples](https://github.com/awslabs/python-to-yaml-dag-converter-mwaa-serverless/blob/main/dev/integ_test/python_test_folder/supported)

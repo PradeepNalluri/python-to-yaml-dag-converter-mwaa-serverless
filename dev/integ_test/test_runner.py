@@ -7,7 +7,7 @@ from pathlib import Path
 src_path = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(src_path))
 
-from dag_converter.conversion.exceptions import InvalidOperatorError  # noqa: E402
+from dag_converter.conversion.exceptions import InvalidOperatorError, InvalidOperatorParameter  # noqa: E402
 from dag_converter.conversion_manager import ConversionManager  # noqa: E402
 
 
@@ -38,7 +38,7 @@ def run_tests(input_path, output_folder):
             return
     else:
         # Find all Python files in folder
-        python_files = [file for file in input_path.rglob("*.py") if "dependencies" not in str(file) and "airflow_appflow.py" not in str(file)]
+        python_files = [file for file in input_path.rglob("*.py") if "dependencies" not in str(file)]
         if not python_files:
             print(f"No Python files found in {input_path}")
             return
@@ -69,7 +69,7 @@ def run_tests(input_path, output_folder):
             )
             passed.append(py_file.name)
             print(f"✅ {py_file.name} - PASSED")
-        except InvalidOperatorError as e:
+        except (InvalidOperatorError, InvalidOperatorParameter) as e:
             unsupported.append((py_file.name, str(e)))
             print(f"🟨 {py_file.name} - UNSUPPORTED")
         except Exception as e:

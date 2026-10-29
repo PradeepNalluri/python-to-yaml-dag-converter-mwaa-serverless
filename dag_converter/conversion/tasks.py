@@ -1,23 +1,30 @@
 import importlib
 import inspect
 from pathlib import Path
+from typing import Any
 
 from airflow.models.dag import DAG
 from airflow.models.operator import Operator
 from airflow.providers.standard.decorators.python import _PythonDecoratedOperator
+from airflow.providers.standard.operators.python import BranchPythonOperator, PythonOperator
+from airflow.providers.standard.sensors.python import PythonSensor
 from airflow.sdk.definitions.mappedoperator import MappedOperator
 from airflow.utils.types import ArgNotSet
 
-from dag_converter.cleanup import get_cleanup_dag
+from dag_converter.cleanup import is_dag_file_module
+from dag_converter.console_config import print_warning
 from dag_converter.conversion.dynamic_mapping import handle_dynamic_task_mapping
-from dag_converter.conversion.exceptions import InvalidOperatorError
-from dag_converter.conversion.operators.python_decorator import handle_python_decorator
+from dag_converter.conversion.exceptions import InvalidOperatorError, InvalidOperatorParameter
+from dag_converter.dagbag import USER_KWARGS_ATTRIBUTE, get_assigned_attributes
 from dag_converter.schema_parser import ArgumentValidator
 from dag_converter.taskflow_parser import TaskFlowAnalyzer
 
 # Constructor arguments that describe the Dag structure rather than the task. Dag context managers inject
 # these into every operator, and DagFactory rebuilds them from the YAML
 STRUCTURAL_TASK_PARAMETERS = {"dag", "task_group"}
+
+# Operators DagFactory creates only with a 'python_callable' from the YAML
+PYTHON_CALLABLE_OPERATORS = (PythonOperator, BranchPythonOperator, PythonSensor)
 
 
 def convert_tasks(
@@ -37,7 +44,9 @@ def convert_tasks(
             else:
                 dag_params[key] = param
 
-    dag_default_args = getattr(dag_object, "default_args", None) or {}
+    dag_default_args = getattr(dag_object, "default_args", None)
+    if not isinstance(dag_default_args, dict):
+        dag_default_args = {}
 
     # First iteration through tasks to map each task id to its corresponding operator type
     for task in dag_object.tasks:
@@ -55,6 +64,9 @@ def convert_tasks(
 
         # Check if params was explicitly set (different from DAG params)
         init_kwargs = getattr(task, "_BaseOperator__init_kwargs", {})
+        # Arguments the Dag file passed, recorded when the Dag is loaded by get_dag_object. Fall back to
+        # __init_kwargs, which also holds arguments subclasses pass to their base class
+        user_kwargs = getattr(task, "__dict__", {}).get(USER_KWARGS_ATTRIBUTE, init_kwargs)
         params_in_init = init_kwargs.get("params", {})
         params_explicitly_set = "params" in init_kwargs and params_in_init != dag_params
 
@@ -63,75 +75,69 @@ def convert_tasks(
             if task.operator_class is _PythonDecoratedOperator:
                 raise InvalidOperatorError("Operator PythonDecoratedOperator is not supported")
 
-            full_operator_name = f"{task._task_module}.{task.task_type}"
+            operator_module = task._task_module
         else:
-            full_operator_name = f"{task.__module__}.{task.task_type}"
+            operator_module = task.__module__
+        full_operator_name = f"{operator_module}.{task.task_type}"
+
+        # DagBag imports the Dag file under an internal module name that cannot be imported anywhere else
+        if is_dag_file_module(operator_module):
+            raise InvalidOperatorError(
+                f"Operator {task.task_type} is defined in the Dag file. "
+                "Move it to a module that can be imported where the YAML Dag runs"
+            )
+        warn_if_unverified_operator(task.task_type, full_operator_name, validator)
+
+        # DagFactory requires 'python_callable' in the YAML for these operators, even for subclasses that set it
+        if (
+            not isinstance(task, MappedOperator)
+            and isinstance(task, PYTHON_CALLABLE_OPERATORS)
+            and "python_callable" not in user_kwargs
+        ):
+            raise InvalidOperatorError(
+                f"Operator {task.task_type} sets python_callable itself. DagFactory requires python_callable "
+                "for PythonOperator, BranchPythonOperator and PythonSensor subclasses"
+            )
 
         tasks[task_id] = {"operator": full_operator_name}
-        valid_task_parameters = get_operator_parameters(full_operator_name)
 
         # Handle TaskFlow
         if isinstance(task, _PythonDecoratedOperator):
             raise InvalidOperatorError("Operator PythonDecoratedOperator is not supported")
-            # Convert any python callables into <file_name>.<function_name> format for easier parsing
-            tasks[task_id] = get_cleanup_dag(tasks[task_id])
-            handle_python_decorator(tasks[task_id], taskflow_parser)
 
-        # Only read attributes that map to constructor parameters. Reading every attribute in dir(task)
-        # evaluates lazy properties (e.g. SQL operator hooks) that open connections to external systems
-        for key in sorted(valid_task_parameters):
-            try:
-                value = getattr(task, key, None)
-            except Exception:
+        # Only the arguments the user passed are written. DagFactory runs the operator's __init__ again, so
+        # values __init__ derived (attributes) or passed to its base class must not be written back
+        for key, value in user_kwargs.items():
+            if key in STRUCTURAL_TASK_PARAMETERS or value is None or isinstance(value, ArgNotSet):
                 continue
-            # Filter out extraneous task parameters generated by DagBag through validation
-            if validator.validate_field("task", key, value):
-                # Skip DTM keywords, those will be handled in another function
-                # TODO: check if op_kwargs_expand_input exists in Dag Object
-                if (
-                    key in ["op_kwargs_expand_input", "expand_input", "partial_kwargs", "map_index_template"]
-                    or value is None
-                    or isinstance(value, ArgNotSet)
-                ):
-                    pass
-                # Skip params only if they match DAG params AND were not explicitly set
-                elif key == "params" and value == dag_params and not params_explicitly_set:
-                    pass
-                else:
-                    tasks[task_id][key] = value
+            # Airflow merges Dag default_args into every operator's kwargs. Those are already in the
+            # Dag's default_args, so they are only repeated on the task when overridden
+            if key in dag_default_args and value == dag_default_args[key]:
+                continue
+            # Skip params only if they match DAG params AND were not explicitly set
+            if key == "params" and value == dag_params and not params_explicitly_set:
+                continue
+            tasks[task_id][key] = get_task_argument_value(task_id, key, value)
 
-        # These are the core parameters that Python file has for each operator/sensor.
-        # Helps find any additional missing parameters (important)
-        if hasattr(task, "_BaseOperator__init_kwargs"):
-            parameters = getattr(task, "_BaseOperator__init_kwargs", None)
-            for key, value in parameters.items():
-                if (
-                    key not in valid_task_parameters
-                    or key in STRUCTURAL_TASK_PARAMETERS
-                    or value is None
-                    or isinstance(value, ArgNotSet)
-                ):
-                    continue
-                # Parameters explicitly passed by the user are kept even if the schema does not list them,
-                # so operators outside the schema keep their operator-specific arguments.
-                # Parameters the schema does list must still pass its value checks
-                if validator.is_known_field("task", key):
-                    if not validator.validate_field("task", key, value):
-                        continue
-                # Airflow merges Dag default_args into every operator's kwargs. Those are already in the
-                # Dag's default_args, so they are only repeated on the task when overridden
-                elif key in dag_default_args and value == dag_default_args[key]:
-                    continue
-                # Skip params only if they match DAG params AND were not explicitly set
-                if key == "params" and value == dag_params and not params_explicitly_set:
-                    continue
-                tasks[task_id][key] = value
+        # Attributes the Dag file assigned after creating the operator
+        for key, value in get_assigned_attributes(task).items():
+            if key in STRUCTURAL_TASK_PARAMETERS or value is None or isinstance(value, ArgNotSet):
+                continue
+            tasks[task_id][key] = get_task_argument_value(task_id, key, value)
 
         tasks[task_id]["dependencies"] = list(getattr(task, "upstream_task_ids", []))
 
         # Handle DTM
         if isinstance(task, MappedOperator):
-            handle_dynamic_task_mapping(tasks[task_id], task_types, task, validator)
+            handle_dynamic_task_mapping(
+                tasks[task_id],
+                task_types,
+                task,
+                get_operator_defaults(task.operator_class),
+                dag_default_args,
+            )
+            for key, value in tasks[task_id].get("partial", {}).items():
+                tasks[task_id]["partial"][key] = get_task_argument_value(task_id, key, value)
 
         # Handle operator-specific parameters that we need to delete
         if "operators.appflow" in full_operator_name and "flow_update" in tasks[task_id]:
@@ -158,6 +164,45 @@ def convert_tasks(
                 del tasks[task_id]["failure_states"]
 
     return tasks
+
+
+def get_task_argument_value(task_id: str, key: str, value: Any) -> Any:
+    """Check a task argument DagFactory cannot represent, returning the value to write"""
+    # DagFactory accepts a single callback per callback argument
+    if key.endswith("_callback") and isinstance(value, list | tuple):
+        if len(value) > 1:
+            raise InvalidOperatorParameter(
+                f"Task '{task_id}' passes {len(value)} callables to '{key}'. DagFactory supports a single callback"
+            )
+        return value[0] if value else None
+    return value
+
+
+def warn_if_unverified_operator(task_type: str, full_operator_name: str, validator: ArgumentValidator):
+    """
+    Warn about operators missing from the verified operator list.
+
+    The static check of the Dag file only sees classes whose names contain 'Operator' or 'Sensor', so the warning
+    is repeated here for the remaining ones.
+    """
+    if "Operator" in task_type or "Sensor" in task_type:
+        return
+    if full_operator_name not in validator.get_allowed_operators():
+        print_warning(f"Operator {task_type} has not been verified for conversion, converting anyway")
+
+
+def get_operator_defaults(operator_class: type) -> dict[str, Any]:
+    """Returns the constructor default of every parameter of 'operator_class', following the class MRO"""
+    defaults = {}
+    for cls in reversed(operator_class.__mro__):
+        try:
+            parameters = inspect.signature(cls.__init__).parameters
+        except (TypeError, ValueError):
+            continue
+        for name, parameter in parameters.items():
+            if parameter.default is not inspect.Parameter.empty:
+                defaults[name] = parameter.default
+    return defaults
 
 
 def get_operator_parameters(operator_class_or_string: type[Operator] | str) -> list[str]:

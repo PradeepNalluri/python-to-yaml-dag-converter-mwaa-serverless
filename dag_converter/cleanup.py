@@ -1,5 +1,7 @@
 """Module for cleaning up data structures before serialization."""
 
+import dataclasses
+import functools
 import re
 from datetime import date, datetime, time, timedelta
 from enum import Enum
@@ -7,6 +9,27 @@ from typing import Any
 
 from airflow.sdk.definitions.param import ParamsDict
 from airflow.sdk.definitions.xcom_arg import PlainXComArg
+
+from dag_converter.conversion.exceptions import InvalidOperatorParameter
+
+# DagBag imports Dag files under internal module names that start with this prefix
+DAG_FILE_MODULE_PREFIX = "unusual_prefix_"
+
+
+def is_dag_file_module(module_name: str) -> bool:
+    """Check if 'module_name' is DagBag's internal name for the Dag file, which cannot be imported elsewhere"""
+    return module_name.startswith(DAG_FILE_MODULE_PREFIX)
+
+
+def get_type_path(obj: Any) -> str:
+    """Import path of the class of 'obj' for DagFactory's '__type__'"""
+    cls = obj.__class__
+    if is_dag_file_module(cls.__module__):
+        raise InvalidOperatorParameter(
+            f"{cls.__name__} is defined in the Dag file. "
+            "Move it to a module that can be imported where the YAML Dag runs"
+        )
+    return f"{cls.__module__}.{cls.__qualname__}"
 
 
 def get_cleanup_dag(obj: Any) -> Any:
@@ -43,6 +66,10 @@ def get_cleanup_dag(obj: Any) -> Any:
     if isinstance(obj, str):
         return str(obj)
 
+    # Before the primitive check, IntEnum and IntFlag members are ints
+    if isinstance(obj, Enum):
+        return {"__type__": get_type_path(obj), "__args__": [obj.value]}
+
     if is_primitive(obj):
         return obj
 
@@ -54,9 +81,6 @@ def get_cleanup_dag(obj: Any) -> Any:
 
     if isinstance(obj, ParamsDict):
         return obj.dump()
-
-    if isinstance(obj, Enum):
-        return {"__type__": obj.__module__ + "." + obj.__class__.__name__, "__args__": [obj.value]}
 
     if isinstance(obj, dict):
         # Handle encoded values
@@ -94,6 +118,12 @@ def get_cleanup_dag(obj: Any) -> Any:
     if isinstance(obj, timedelta):
         return {"__type__": "datetime.timedelta", "seconds": obj.total_seconds()}
 
+    if isinstance(obj, functools.partial):
+        raise InvalidOperatorParameter(
+            f"functools.partial of {getattr(obj.func, '__name__', obj.func)} cannot be converted. "
+            "Use a module-level function instead"
+        )
+
     if callable(obj) and hasattr(obj, "__name__"):
         function_name = obj.__name__
 
@@ -112,8 +142,17 @@ def get_cleanup_dag(obj: Any) -> Any:
 
         return f"{input_file_name}.{function_name}"
 
-    if hasattr(obj, "__dict__"):  # Handle custom objects
-        return {"__type__": obj.__module__ + "." + obj.__class__.__name__, **get_cleanup_dag(obj.__dict__)}
+    # Dataclasses are rebuilt from their __init__ fields
+    if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
+        init_fields = {field.name: getattr(obj, field.name) for field in dataclasses.fields(obj) if field.init}
+        return {"__type__": get_type_path(obj), **get_cleanup_dag(init_fields)}
+
+    # Other objects would be rebuilt from __dict__, which does not have to match their __init__ arguments
+    if hasattr(obj, "__dict__"):
+        raise InvalidOperatorParameter(
+            f"Value of type {obj.__module__}.{obj.__class__.__name__} cannot be converted. "
+            "Use primitive values, enums, dataclasses or datetime values"
+        )
 
     return str(obj)
 

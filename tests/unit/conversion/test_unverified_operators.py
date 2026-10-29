@@ -94,16 +94,15 @@ class TestUnverifiedOperatorConversion(unittest.TestCase):
         self.assertNotIn("email_on_failure", tasks["inherits"])
         self.assertEqual(tasks["overrides"]["owner"], "other-team")
 
-    def test_schema_value_checks_still_apply(self):
-        """Arguments listed in the schema must still pass its value checks"""
+    def test_user_arguments_are_not_dropped_by_schema_value_checks(self):
+        """DagFactory validates the values, the schema must not silently drop them"""
         with DAG(dag_id="test_dag", start_date=datetime(2026, 1, 1), schedule=None) as dag:
-            SQLExecuteQueryOperator(task_id="run_sql", conn_id="my_db", sql="SELECT 1", trigger_rule="all_done")
+            SQLExecuteQueryOperator(task_id="run_sql", conn_id="my_db", sql="SELECT 1", trigger_rule="always")
 
         self.validator.allowed_fields["task"]["trigger_rule"] = 'enum("all_success", "one_success", required=False)'
         tasks = self._convert(dag)
 
-        self.assertNotIn("trigger_rule", tasks["run_sql"])
-
+        self.assertEqual(tasks["run_sql"]["trigger_rule"], "always")
 
 if __name__ == "__main__":
     unittest.main()

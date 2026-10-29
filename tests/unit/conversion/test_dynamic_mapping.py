@@ -1,13 +1,23 @@
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
+
+from airflow.sdk.definitions._internal.expandinput import ListOfDictsExpandInput
 
 from dag_converter.conversion.dynamic_mapping import handle_dynamic_task_mapping, reformat
+from dag_converter.conversion.exceptions import InvalidOperatorError
 
 
 class TestHandleDynamicTaskMapping(unittest.TestCase):
     def setUp(self):
-        self.mock_validator = Mock()
         self.task_type = {"task1": "_PythonDecoratedOperator", "task2": "BashOperator"}
+
+    def _mapped_task(self, partial_kwargs):
+        task = Mock()
+        task.task_id = "mapped"
+        task.partial_kwargs = partial_kwargs
+        del task.op_kwargs_expand_input
+        del task.expand_input
+        return task
 
     def test_op_kwargs_expand_input(self):
         """Test handling op_kwargs_expand_input"""
@@ -18,7 +28,7 @@ class TestHandleDynamicTaskMapping(unittest.TestCase):
 
         tasks_dict = {}
 
-        handle_dynamic_task_mapping(tasks_dict, self.task_type, task, self.mock_validator)
+        handle_dynamic_task_mapping(tasks_dict, self.task_type, task, {}, {})
 
         self.assertEqual(tasks_dict["expand"], {"param1": "value1"})
 
@@ -33,48 +43,59 @@ class TestHandleDynamicTaskMapping(unittest.TestCase):
 
         tasks_dict = {}
 
-        handle_dynamic_task_mapping(tasks_dict, self.task_type, task, self.mock_validator)
+        handle_dynamic_task_mapping(tasks_dict, self.task_type, task, {}, {})
 
         self.assertEqual(tasks_dict["expand"], {"op_kwargs": {"param1": "value1"}})
 
-    @patch("dag_converter.conversion.dynamic_mapping.get_cleanup_dag")
-    def test_partial_kwargs(self, mock_get_cleanup):
-        """Test handling partial_kwargs"""
-        mock_get_cleanup.return_value = {"python_callable": "func", "retries": 3}
-        self.mock_validator.validate_field.return_value = True
-
+    def test_expand_kwargs_is_rejected(self):
         task = Mock()
-        task.partial_kwargs = {"python_callable": "func", "retries": 3}
-        del task.op_kwargs_expand_input
-        del task.expand_input
+        task.task_id = "mapped"
+        task.expand_input = ListOfDictsExpandInput([{"x": 1}])
+
+        with self.assertRaisesRegex(InvalidOperatorError, "expand_kwargs"):
+            handle_dynamic_task_mapping({}, self.task_type, task, {}, {})
+
+    def test_partial_kwargs(self):
+        """python_callable moves to the task, user arguments stay in partial"""
+        task = self._mapped_task({"python_callable": "func", "retries": 3, "custom": "value"})
 
         tasks_dict = {}
 
-        handle_dynamic_task_mapping(tasks_dict, self.task_type, task, self.mock_validator)
+        handle_dynamic_task_mapping(tasks_dict, self.task_type, task, {"retries": 0}, {})
 
         self.assertEqual(tasks_dict["python_callable"], "func")
-        self.assertEqual(tasks_dict["partial"], {"retries": 3})
+        self.assertEqual(tasks_dict["partial"], {"retries": 3, "custom": "value"})
 
-    @patch("dag_converter.conversion.dynamic_mapping.get_cleanup_dag")
-    def test_partial_kwargs_cleanup(self, mock_get_cleanup):
-        """Test cleanup of invalid partial_kwargs"""
-        mock_get_cleanup.return_value = {"valid_param": "value", "invalid_param": "value", "none_param": None}
+    def test_partial_kwargs_defaults_are_dropped(self):
+        """Airflow fills partial_kwargs with operator defaults and Dag default_args"""
+        task = self._mapped_task(
+            {
+                "y": 100,
+                "owner": "airflow",
+                "retries": 2,
+                "on_success_callback": [],
+                "map_index_template": None,
+                "execution_timeout": None,
+                "dag": Mock(),
+            }
+        )
 
-        def validate_side_effect(section, key, value):
-            return key == "valid_param"
+        tasks_dict = {"operator": "AddOperator"}
 
-        self.mock_validator.validate_field.side_effect = validate_side_effect
+        handle_dynamic_task_mapping(
+            tasks_dict, self.task_type, task, {"owner": "airflow", "on_success_callback": None}, {"retries": 2}
+        )
 
-        task = Mock()
-        task.partial_kwargs = {"valid_param": "value", "invalid_param": "value", "none_param": None}
-        del task.op_kwargs_expand_input
-        del task.expand_input
+        self.assertEqual(tasks_dict["partial"], {"y": 100})
+
+    def test_partial_omitted_when_only_defaults(self):
+        task = self._mapped_task({"owner": "airflow"})
 
         tasks_dict = {}
 
-        handle_dynamic_task_mapping(tasks_dict, self.task_type, task, self.mock_validator)
+        handle_dynamic_task_mapping(tasks_dict, self.task_type, task, {"owner": "airflow"}, {})
 
-        self.assertEqual(tasks_dict["partial"], {"valid_param": "value"})
+        self.assertNotIn("partial", tasks_dict)
 
 
 class TestReformat(unittest.TestCase):

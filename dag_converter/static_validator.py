@@ -78,6 +78,11 @@ def extract_operator_types(file_path: Path) -> set[str]:
                 class_name = node.func.id
                 if "Operator" in class_name or "Sensor" in class_name:
                     operator_types.add(class_name)
+            # Class accessed through a module like "my_ops.CustomOperator(...)"
+            elif isinstance(node.func, ast.Attribute):
+                class_name = node.func.attr
+                if "Operator" in class_name or "Sensor" in class_name:
+                    operator_types.add(class_name)
 
         # Look for method calls like "SomeOperator.partial/expand/expand_kwargs(...)"
         elif (
