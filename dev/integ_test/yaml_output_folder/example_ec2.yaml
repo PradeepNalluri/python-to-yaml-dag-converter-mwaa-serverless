@@ -63,8 +63,8 @@ example_ec2:
             DeleteOnTermination: true
       wait_for_completion: true
       dependencies:
-      - image_id
       - key_name
+      - image_id
     instance_id:
       operator: airflow.providers.standard.operators.python.PythonOperator
       task_id: instance_id
@@ -88,8 +88,8 @@ example_ec2:
       instance_id: "{{ task_instance.xcom_pull(task_ids='instance_id', key='return_value')\
         \ }}"
       dependencies:
-      - stop_instance
       - instance_id
+      - stop_instance
     await_instance:
       operator: airflow.providers.amazon.aws.sensors.ec2.EC2InstanceStateSensor
       task_id: await_instance
@@ -117,8 +117,8 @@ example_ec2:
       poll_interval: 60
       max_attempts: 40
       dependencies:
-      - reboot_instace
       - instance_id
+      - reboot_instace
     terminate_instance:
       operator: airflow.providers.amazon.aws.operators.ec2.EC2TerminateInstanceOperator
       task_id: terminate_instance

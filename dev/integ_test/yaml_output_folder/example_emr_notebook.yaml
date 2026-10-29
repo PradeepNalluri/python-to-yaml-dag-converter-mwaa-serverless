@@ -35,8 +35,8 @@ example_emr_notebook:
       notebook_execution_id: "{{ task_instance.xcom_pull(task_ids='start_execution',\
         \ key='return_value') }}"
       dependencies:
-      - wait_for_execution_start
       - start_execution
+      - wait_for_execution_start
     wait_for_execution_stop:
       operator: airflow.providers.amazon.aws.sensors.emr.EmrNotebookExecutionSensor
       task_id: wait_for_execution_stop
@@ -48,8 +48,8 @@ example_emr_notebook:
         - - STOPPED
       poke_interval: 5
       dependencies:
-      - start_execution
       - stop_execution
+      - start_execution
     finish_execution:
       operator: airflow.providers.amazon.aws.operators.emr.EmrStartNotebookExecutionOperator
       task_id: finish_execution

@@ -13,6 +13,7 @@ example_eks_templated:
       operator: airflow.providers.amazon.aws.operators.eks.EksCreateClusterOperator
       task_id: create_eks_cluster
       cluster_name: test-cluster
+      compute: null
       cluster_role_arn: test-cluster-role-arn
       resources_vpc_config:
         subnetIds:

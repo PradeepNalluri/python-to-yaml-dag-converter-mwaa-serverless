@@ -11,7 +11,7 @@ example_sagemaker_unified_studio_notebook:
       notebook_identifier: NOTEBOOK_ID
       domain_identifier: DOMAIN_ID
       owning_project_identifier: PROJECT_ID
-      client_token: idempotency-token-1793255635
+      client_token: idempotency-token-1793278575
       notebook_parameters:
         param1: value1
         param2: value2

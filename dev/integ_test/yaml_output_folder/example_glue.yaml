@@ -7,6 +7,7 @@ example_glue:
       year: 2026
       month: 7
       day: 15
+      fold: 1
   schedule: '@daily'
   tasks:
     create_bucket:
@@ -111,4 +112,5 @@ example_glue:
     year: 2026
     month: 7
     day: 15
+    fold: 1
   tags: []

@@ -10,6 +10,7 @@ startup_script_test:
       year: 2026
       month: 1
       day: 1
+      fold: 1
   schedule: '@once'
   tasks:
     check_environment_variable:
@@ -25,4 +26,5 @@ startup_script_test:
     year: 2026
     month: 1
     day: 1
+    fold: 1
   tags: []

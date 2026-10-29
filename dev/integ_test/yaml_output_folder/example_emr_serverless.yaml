@@ -51,8 +51,8 @@ example_emr_serverless:
             logUri: s3://test-emr-serverless-bucket/logs
       wait_for_completion: false
       dependencies:
-      - wait_for_app_creation
       - create_emr_serverless_task
+      - wait_for_app_creation
     wait_for_job:
       operator: airflow.providers.amazon.aws.sensors.emr.EmrServerlessJobSensor
       task_id: wait_for_job
@@ -76,8 +76,8 @@ example_emr_serverless:
         \ key='return_value') }}"
       force_stop: true
       dependencies:
-      - wait_for_job
       - create_emr_serverless_task
+      - wait_for_job
     delete_application:
       operator: airflow.providers.amazon.aws.operators.emr.EmrServerlessDeleteApplicationOperator
       task_id: delete_application

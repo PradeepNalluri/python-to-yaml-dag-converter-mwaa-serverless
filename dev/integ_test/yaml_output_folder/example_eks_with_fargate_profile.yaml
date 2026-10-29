@@ -20,6 +20,7 @@ example_eks_with_fargate_profile:
         - subnet-67890cd
         endpointPublicAccess: true
         endpointPrivateAccess: false
+      compute: null
       dependencies: []
     wait_for_create_cluster:
       operator: airflow.providers.amazon.aws.sensors.eks.EksClusterStateSensor

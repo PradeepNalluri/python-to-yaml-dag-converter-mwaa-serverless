@@ -158,9 +158,9 @@ example_s3:
       dest_bucket_key: test-key2
       dependencies:
       - sensor_key_with_regex_deferrable
-      - sensor_two_keys_deferrable
-      - sensor_one_key_deferrable
       - sensor_key_with_function_deferrable
+      - sensor_one_key_deferrable
+      - sensor_two_keys_deferrable
     sensor_keys_unchanged:
       operator: airflow.providers.amazon.aws.sensors.s3.S3KeysUnchangedSensor
       task_id: sensor_keys_unchanged

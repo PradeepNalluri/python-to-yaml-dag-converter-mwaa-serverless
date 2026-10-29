@@ -8,6 +8,7 @@ many_logging_dag:
       year: 2026
       month: 1
       day: 1
+      fold: 1
     depends_on_past: false
     email:
     - airflow@example.com
@@ -24,16 +25,16 @@ many_logging_dag:
       operator: airflow.providers.standard.operators.empty.EmptyOperator
       task_id: tasks_end
       dependencies:
-      - logging_task_5
-      - logging_task_8
-      - logging_task_1
-      - logging_task_7
-      - logging_task_9
-      - logging_task_3
       - logging_task_6
-      - logging_task_10
       - logging_task_2
       - logging_task_4
+      - logging_task_5
+      - logging_task_1
+      - logging_task_3
+      - logging_task_7
+      - logging_task_8
+      - logging_task_10
+      - logging_task_9
     logging_task_1:
       operator: airflow.providers.standard.operators.python.PythonOperator
       task_id: logging_task_1
@@ -122,4 +123,5 @@ many_logging_dag:
     year: 2026
     month: 1
     day: 1
+    fold: 1
   tags: []
