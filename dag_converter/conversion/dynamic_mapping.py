@@ -64,7 +64,7 @@ def handle_dynamic_task_mapping(
 
         # DagFactory imports callbacks of the task itself, not in 'partial'
         for key in [key for key in tasks_dict["partial"] if key.endswith("_callback")]:
-            tasks_dict[key] = unwrap_callbacks(key, tasks_dict["partial"].pop(key))
+            tasks_dict[key] = tasks_dict["partial"].pop(key)
 
         # Handle Python Operator that uses DTM
         # The 'python_callable' will be set to be a string representation of the actual function

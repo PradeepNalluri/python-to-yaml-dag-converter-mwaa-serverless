@@ -252,6 +252,33 @@ class TestValidationRound1(DagConversionTestCase):
         self.assertEqual(payload.timezone_name, "Asia/Kolkata")
 
 
+class TestValidationRound2(DagConversionTestCase):
+    def test_two_callbacks_in_partial_are_rejected(self):
+        """N1: callbacks moved out of 'partial' skipped the single callback check"""
+        with self.assertRaisesRegex(InvalidOperatorParameter, "single callback"):
+            self.convert_dag(
+                tasks="AddOperator.partial(task_id='m', on_success_callback=[record, record2]).expand(x=[1])"
+            )
+
+    def test_pendulum_types(self):
+        """N2: naive pendulum DateTime, Date and Duration became datetime types"""
+        values = {
+            "naive": "pendulum.naive(2024, 1, 2, 3)",
+            "date": "pendulum.date(2024, 1, 2)",
+            "duration": "pendulum.duration(hours=2, minutes=5)",
+        }
+        tasks = "\n    ".join(f"PayloadOperator(task_id='{key}', payload={value})" for key, value in values.items())
+
+        original, converted, _ = self.convert_dag(tasks=tasks)
+
+        for task_id in values:
+            a, b = original.get_task(task_id).payload, converted.get_task(task_id).payload
+            self.assertEqual(b, a)
+            self.assertIs(type(b), type(a))
+            if task_id == "naive":
+                self.assertEqual(b.fold, a.fold)
+
+
 class TestSchedules(DagConversionTestCase):
     def test_cron_trigger_timetable_timezone(self):
         """N8: the timetable timezone was dropped"""

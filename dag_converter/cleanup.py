@@ -144,6 +144,14 @@ def get_cleanup_dag(obj: Any) -> Any:
     if isinstance(obj, tuple | set | frozenset):
         raise_unsupported_value(obj)
 
+    # Naive pendulum DateTimes default to fold=1, pendulum.naive restores them as they are
+    if isinstance(obj, pendulum.DateTime) and obj.tzinfo is None:
+        return typed(
+            "pendulum.naive",
+            [obj.year, obj.month, obj.day, obj.hour, obj.minute, obj.second, obj.microsecond],
+            fold=obj.fold,
+        )
+
     if isinstance(obj, datetime):
         custom_object = {
             "year": obj.year,
@@ -167,7 +175,8 @@ def get_cleanup_dag(obj: Any) -> Any:
         return value
 
     if isinstance(obj, date):
-        return typed("datetime.date", [obj.year, obj.month, obj.day])
+        date_type = "pendulum.date" if isinstance(obj, pendulum.Date) else "datetime.date"
+        return typed(date_type, [obj.year, obj.month, obj.day])
 
     if isinstance(obj, time):
         custom_object = {}
@@ -188,7 +197,8 @@ def get_cleanup_dag(obj: Any) -> Any:
         return get_timezone_value(obj, None)
 
     if isinstance(obj, timedelta):
-        return typed("datetime.timedelta", seconds=obj.total_seconds())
+        duration_type = "pendulum.duration" if isinstance(obj, pendulum.Duration) else "datetime.timedelta"
+        return typed(duration_type, seconds=obj.total_seconds())
 
     if isinstance(obj, functools.partial):
         raise InvalidOperatorParameter(

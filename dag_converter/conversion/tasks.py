@@ -153,6 +153,9 @@ def convert_tasks(
             )
             for key, value in tasks[task_id].get("partial", {}).items():
                 tasks[task_id]["partial"][key] = get_task_argument_value(task_id, key, value)
+            # Callbacks moved out of 'partial' to the task
+            for key in [key for key in tasks[task_id] if key.endswith("_callback")]:
+                tasks[task_id][key] = get_task_argument_value(task_id, key, tasks[task_id][key])
 
         # Handle operator-specific parameters that we need to delete
         if "operators.appflow" in full_operator_name and "flow_update" in tasks[task_id]:
