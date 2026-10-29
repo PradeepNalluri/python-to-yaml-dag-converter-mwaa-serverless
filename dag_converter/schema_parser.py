@@ -39,10 +39,6 @@ class ArgumentValidator:
 
         return allowed_fields
 
-    def is_known_field(self, section_key: str, field_key: str) -> bool:
-        """Check whether 'field_key' is declared in the schema section"""
-        return field_key in self.allowed_fields.get(section_key, {})
-
     def validate_field(self, section_key: str, field_key: str, field_value: Any | None, no_value_check=False) -> bool:
         """Verify that 'field_key' and corresponding 'field_value" are accepted"""
         allowed_fields = self.allowed_fields
