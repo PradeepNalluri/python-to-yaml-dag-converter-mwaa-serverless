@@ -94,8 +94,8 @@ example_ec2:
       instance_id: "{{ task_instance.xcom_pull(task_ids='instance_id', key='return_value')\
         \ }}"
       dependencies:
-      - instance_id
       - stop_instance
+      - instance_id
     await_instance:
       operator: airflow.providers.amazon.aws.sensors.ec2.EC2InstanceStateSensor
       task_id: await_instance
@@ -103,8 +103,8 @@ example_ec2:
         \ }}"
       target_state: running
       dependencies:
-      - instance_id
       - start_instance
+      - instance_id
     reboot_instace:
       operator: airflow.providers.amazon.aws.operators.ec2.EC2RebootInstanceOperator
       task_id: reboot_instace

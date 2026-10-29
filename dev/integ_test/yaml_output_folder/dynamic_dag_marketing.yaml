@@ -46,8 +46,8 @@ dynamic_dag_marketing:
       task_id: end
       bash_command: "echo 'Completed processing for marketing'"
       dependencies:
-      - process_analytics
       - process_campaigns
+      - process_analytics
   catchup: false
   dag_display_name: dynamic_dag_marketing
   description: Dynamically generated DAG for marketing

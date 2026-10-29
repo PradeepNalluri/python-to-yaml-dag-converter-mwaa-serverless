@@ -54,8 +54,8 @@ example_emr_notebook:
         - - STOPPED
       poke_interval: 5
       dependencies:
-      - stop_execution
       - start_execution
+      - stop_execution
     finish_execution:
       operator: airflow.providers.amazon.aws.operators.emr.EmrStartNotebookExecutionOperator
       task_id: finish_execution

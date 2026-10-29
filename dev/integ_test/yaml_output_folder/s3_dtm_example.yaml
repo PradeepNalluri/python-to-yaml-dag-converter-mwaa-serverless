@@ -52,9 +52,9 @@ s3_dtm_example:
       task_id: list_objects
       bucket: dtm-example-bucket
       dependencies:
+      - create_object_0
       - create_object_1
       - create_object_2
-      - create_object_0
     delete_objects:
       operator: airflow.providers.amazon.aws.operators.s3.S3DeleteObjectsOperator
       dependencies:

@@ -31,15 +31,15 @@ many_logging_dag:
       task_id: tasks_end
       dependencies:
       - logging_task_8
-      - logging_task_4
-      - logging_task_7
-      - logging_task_1
-      - logging_task_5
-      - logging_task_9
-      - logging_task_10
-      - logging_task_6
-      - logging_task_2
       - logging_task_3
+      - logging_task_6
+      - logging_task_1
+      - logging_task_9
+      - logging_task_5
+      - logging_task_7
+      - logging_task_2
+      - logging_task_10
+      - logging_task_4
     logging_task_1:
       operator: airflow.providers.standard.operators.python.PythonOperator
       task_id: logging_task_1
