@@ -9,6 +9,7 @@ from enum import Enum
 from pathlib import PurePath
 from typing import Any
 
+import pendulum
 from airflow.sdk.definitions._internal.types import ArgNotSet
 from airflow.sdk.definitions.param import Param, ParamsDict
 from airflow.sdk.definitions.xcom_arg import PlainXComArg
@@ -81,12 +82,12 @@ def get_cleanup_dag(obj: Any) -> Any:
         print("xcom arg:" + str(obj))
         return re.sub(pattern, "", obj)
 
-    # String-valued enums (e.g. OnFinishAction) are accepted by operators as their plain value.
-    # str() would render them as "ClassName.MEMBER"
-    if isinstance(obj, str) and isinstance(obj, Enum):
+    # Airflow's own string-valued enums (e.g. TriggerRule, OnFinishAction) are accepted as their plain value.
+    # Other enums keep their type through '__type__' below
+    if isinstance(obj, str) and isinstance(obj, Enum) and is_airflow_enum(obj):
         return obj.value
 
-    if isinstance(obj, str):
+    if isinstance(obj, str) and not isinstance(obj, Enum):
         return str(obj)
 
     if isinstance(obj, TypedValue):
@@ -159,7 +160,11 @@ def get_cleanup_dag(obj: Any) -> Any:
         # The second occurrence of a wall-clock time repeated when clocks go back
         if obj.fold:
             custom_object["fold"] = 1
-        return typed("datetime.datetime", **custom_object)
+        value = typed("datetime.datetime", **custom_object)
+        # pendulum.instance turns the datetime back into a pendulum DateTime, keeping its timezone
+        if isinstance(obj, pendulum.DateTime) and obj.tzinfo is not None:
+            return typed("pendulum.instance", [value])
+        return value
 
     if isinstance(obj, date):
         return typed("datetime.date", [obj.year, obj.month, obj.day])
@@ -233,10 +238,19 @@ def raise_unsupported_value(obj: Any):
     )
 
 
+def is_airflow_enum(member: Enum) -> bool:
+    """Enums defined by Airflow or its providers, whose operators accept their plain value"""
+    return type(member).__module__.split(".")[0] == "airflow"
+
+
 def get_dict_key(key: Any) -> Any:
-    """Dict key DagFactory can load. String-valued enum keys are written as their value, which hashes the same"""
+    """Dict key DagFactory can load. Keys cannot carry a '__type__', so only Airflow's str enums are allowed"""
     if isinstance(key, str) and isinstance(key, Enum):
-        return key.value
+        if is_airflow_enum(key):
+            return key.value
+        raise InvalidOperatorParameter(
+            f"Dict key {key!r} cannot be converted, YAML keys cannot keep the enum type. Use its value as the key"
+        )
     if isinstance(key, KEY_TYPES) and not isinstance(key, Enum):
         return key
     raise InvalidOperatorParameter(f"Dict key {key!r} cannot be converted. Use str, int, float or bool keys")

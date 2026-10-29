@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from airflow.models.dag import DAG
+from airflow.sdk import DAG as SdkDAG
 from airflow.sdk.definitions.param import Param
 
 from dag_converter.cleanup import get_param_value, get_timezone_name
@@ -144,7 +145,7 @@ def get_converted_format(
 
     # Set Dag arguments DagFactory drops, also when the schema does not list them. Compared with a Dag created
     # without arguments, since attrs defaults are not in the signature
-    if isinstance(dag_object, DAG):
+    if isinstance(dag_object, SdkDAG):
         reference_dag = get_reference_dag()
         for key in DAG_ARGUMENTS_IGNORED_BY_DAGFACTORY:
             value = getattr(dag_object, key, None)

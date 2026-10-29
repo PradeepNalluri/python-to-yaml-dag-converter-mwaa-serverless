@@ -4,6 +4,8 @@ import unittest
 from datetime import datetime, timezone
 from unittest.mock import patch
 
+import pendulum
+
 from dag_converter.conversion.exceptions import InvalidDagParameter, InvalidOperatorParameter
 from tests.unit.conversion.test_dag_conversion_fidelity import DagConversionTestCase
 
@@ -139,16 +141,15 @@ class TestValues(DagConversionTestCase):
         original, converted, _ = self.convert_dag(
             tasks="PayloadOperator(task_id='named', payload=Pair(1, 2))\n"
             "    PayloadOperator(task_id='shape', payload=Shape.SQUARE)\n"
-            "    PayloadOperator(task_id='keys', payload={Key.A: 1})\n"
             "    PayloadOperator(task_id='path', payload=PurePosixPath('/tmp/x'))"
         )
 
-        for task_id in ("named", "shape", "keys", "path"):
+        for task_id in ("named", "shape", "path"):
             self.assertEqual(converted.get_task(task_id).payload, original.get_task(task_id).payload)
             self.assertIs(type(converted.get_task(task_id).payload), type(original.get_task(task_id).payload))
 
     def test_unsupported_dict_keys(self):
-        for value in ("{(1, 2): 'tuple key'}", "{'__type__': 'os.system'}"):
+        for value in ("{(1, 2): 'tuple key'}", "{'__type__': 'os.system'}", "{Key.A: 1}"):
             with self.subTest(value=value), self.assertRaises(InvalidOperatorParameter):
                 self.convert_dag(tasks=f"PayloadOperator(task_id='p', payload={value})")
 
@@ -162,6 +163,93 @@ class TestValues(DagConversionTestCase):
         for value in ("lambda context: None", "Helpers.triple"):
             with self.subTest(value=value), self.assertRaises(InvalidOperatorParameter):
                 self.convert_dag(tasks=f"AddOperator(task_id='t', x=1, on_success_callback={value})")
+
+
+class TestValidationRound1(DagConversionTestCase):
+    def test_str_enums_keep_their_type(self):
+        """P1: user str enums became plain strings, Airflow's own stay plain values"""
+        original, converted, dag_yaml = self.convert_dag(
+            tasks="PayloadOperator(task_id='p', payload=Key.A)\n"
+            "    AddOperator(task_id='t', x=1, trigger_rule=__import__('airflow.utils.trigger_rule', "
+            "fromlist=['TriggerRule']).TriggerRule.ALL_DONE)"
+        )
+
+        self.assertIs(converted.get_task("p").payload, original.get_task("p").payload)
+        self.assertEqual(dag_yaml["tasks"]["t"]["trigger_rule"], "all_done")
+
+    def test_callables_dagfactory_does_not_import(self):
+        """P2: callables in other arguments, or nested in containers, would arrive as strings"""
+        for value in (
+            "PayloadOperator(task_id='p', payload=multiply)",
+            "PayloadOperator(task_id='p', payload={'fn': multiply})",
+        ):
+            with self.subTest(value=value), self.assertRaisesRegex(InvalidOperatorParameter, "multiply"):
+                self.convert_dag(tasks=value)
+
+    def test_disable_bundle_versioning_with_sdk_dag(self):
+        """P3: airflow.sdk.DAG is not a subclass of airflow.models.dag.DAG"""
+        source = """
+            from datetime import datetime
+            from airflow.sdk import DAG
+            from {ops} import *
+
+            with DAG(dag_id="{dag_id}", start_date=datetime(2026, 1, 1), schedule=None, disable_bundle_versioning=True):
+                AddOperator(task_id="t", x=1)
+            """
+        with self.assertRaisesRegex(InvalidDagParameter, "disable_bundle_versioning"):
+            self.convert_source(source)
+
+    def test_mapped_task_callbacks(self):
+        """P4: callbacks were written in 'partial', which DagFactory does not import"""
+        original, converted, dag_yaml = self.convert_dag(
+            "start_date=datetime(2026, 1, 1), default_args={'on_failure_callback': record}",
+            tasks="AddOperator.partial(task_id='m', on_success_callback=record2).expand(x=[1])",
+        )
+
+        task = dag_yaml["tasks"]["m"]
+        self.assertNotIn("on_failure_callback", task.get("partial", {}))
+        self.assertEqual(task["on_success_callback"], f"{self.ops}.record2")
+        callbacks = converted.get_task("m").partial_kwargs["on_success_callback"]
+        self.assertEqual([cb.__name__ for cb in callbacks], ["record2"])
+
+    def test_inherited_callbacks(self):
+        """P5: inherited callback lists failed DagFactory validation"""
+        original, converted, _ = self.convert_source(
+            """
+            from datetime import datetime
+            from airflow import DAG
+            from airflow.sdk import TaskGroup
+            from {ops} import *
+
+            late = AddOperator(task_id="late", x=1)
+            with DAG(dag_id="{dag_id}", start_date=datetime(2026, 1, 1), schedule=None,
+                     default_args={"on_success_callback": record, "on_failure_callback": [record2]}) as dag:
+                with TaskGroup("g", default_args={"on_success_callback": [record2]}):
+                    AddOperator(task_id="t", x=1)
+            dag.add_task(late)
+            """
+        )
+
+        self.assertEqual([cb.__name__ for cb in converted.get_task("g.t").on_success_callback], ["record2"])
+        self.assertFalse(converted.get_task("late").on_success_callback)
+        self.assertFalse(converted.get_task("late").on_failure_callback)
+
+    def test_kwargs_only_attribute_not_passed_to_constructor(self):
+        """P6: KwargsOperator reads 'extra' from **kwargs, also when it was not passed"""
+        _, converted, _ = self.convert_dag(tasks="kw = KwargsOperator(task_id='kw', foo='F')\n    kw.extra = 99")
+
+        self.assertEqual(converted.get_task("kw").extra, 99)
+
+    def test_pendulum_datetime_keeps_its_type(self):
+        """P7"""
+        original, converted, _ = self.convert_dag(
+            tasks="PayloadOperator(task_id='p', payload=pendulum.datetime(2024, 5, 6, 7, 8, tz='Asia/Kolkata'))"
+        )
+
+        payload = converted.get_task("p").payload
+        self.assertIsInstance(payload, pendulum.DateTime)
+        self.assertEqual(payload, original.get_task("p").payload)
+        self.assertEqual(payload.timezone_name, "Asia/Kolkata")
 
 
 class TestSchedules(DagConversionTestCase):

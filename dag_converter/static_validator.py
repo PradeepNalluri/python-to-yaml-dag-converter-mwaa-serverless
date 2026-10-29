@@ -19,7 +19,7 @@ def validate_file(file_path: Path, validator: ArgumentValidator) -> list[str]:
     unverified = sorted(
         operator
         for operator in operators_in_file
-        if not any(operator in verified_operator for verified_operator in verified_operators)
+        if not any(operator == verified_operator.rsplit(".", 1)[-1] for verified_operator in verified_operators)
     )
     for operator in unverified:
         print_warning(f"Operator {operator} has not been verified for conversion, converting anyway")

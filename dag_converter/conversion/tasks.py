@@ -10,7 +10,7 @@ from airflow.providers.standard.decorators.python import _PythonDecoratedOperato
 from airflow.providers.standard.operators.python import BranchPythonOperator, PythonOperator
 from airflow.providers.standard.sensors.python import PythonSensor
 from airflow.sdk.definitions.mappedoperator import MappedOperator
-from airflow.utils.types import ArgNotSet
+from airflow.utils.types import NOTSET, ArgNotSet
 
 from dag_converter.cleanup import is_dag_file_module
 from dag_converter.console_config import print_warning
@@ -133,7 +133,8 @@ def convert_tasks(
             tasks[task_id][key] = get_task_argument_value(task_id, key, value)
 
         if not isinstance(task, MappedOperator):
-            tasks[task_id].update(get_inherited_arguments(task, user_kwargs, dag_default_args))
+            for key, value in get_inherited_arguments(task, user_kwargs, dag_default_args).items():
+                tasks[task_id][key] = get_task_argument_value(task_id, key, value)
 
             # Attributes the Dag file assigned after creating the operator
             for key, value in get_converted_assigned_attributes(task, user_kwargs, get_init_kwargs(task)).items():
@@ -222,6 +223,9 @@ def get_converted_assigned_attributes(
     for key, (init_value, value) in get_assigned_attributes(task).items():
         if key in STRUCTURAL_TASK_PARAMETERS or isinstance(value, ArgNotSet):
             continue
+        if key not in parameters and key not in init_kwargs and reads_keyword_argument(task, user_kwargs, key, value):
+            converted[key] = value
+            continue
         if key not in parameters and key not in init_kwargs:
             # The operator does not define the attribute, so it does not read it
             if isinstance(init_value, ArgNotSet):
@@ -231,8 +235,9 @@ def get_converted_assigned_attributes(
                 )
                 continue
             raise InvalidOperatorParameter(
-                f"Task '{task.task_id}' assigns '{key}' after creating the operator. It is not an argument of "
-                f"{task.task_type}, so the assignment cannot be converted"
+                f"Task '{task.task_id}' assigns '{key}' after creating the operator. The converter cannot tell "
+                f"whether {task.task_type} accepts it as an argument, so the assignment cannot be converted. "
+                f"Pass {key}=... to the operator instead"
             )
         # The value __init__ received, including default_args and arguments of subclasses
         passed = init_kwargs[key] if key in init_kwargs else defaults.get(key, init_value)
@@ -247,6 +252,21 @@ def get_converted_assigned_attributes(
             )
         converted[key] = value
     return converted
+
+
+def reads_keyword_argument(task: Operator, user_kwargs: dict[str, Any], key: str, value: Any) -> bool:
+    """
+    Whether the operator stores 'key' as passed when it is given as a keyword argument, e.g. a parameter read
+    from **kwargs. Checked by creating the operator again with the argument, outside of any Dag
+    """
+    arguments = {k: v for k, v in user_kwargs.items() if k not in STRUCTURAL_TASK_PARAMETERS}
+    arguments[key] = value
+    arguments["task_id"] = f"{task.task_id}__dag_converter_check"
+    try:
+        check = type(task)(**arguments)
+    except Exception:
+        return False
+    return not values_differ(getattr(check, key, NOTSET), value)
 
 
 def warn_if_unverified_operator(task_type: str, full_operator_name: str, validator: ArgumentValidator):
