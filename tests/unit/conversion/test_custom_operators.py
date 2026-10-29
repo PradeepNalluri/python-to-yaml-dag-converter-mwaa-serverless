@@ -16,6 +16,7 @@ from dag_converter.conversion_manager import ConversionManager
 from dag_converter.dagbag import get_dag_object
 
 OPS_MODULE = '''
+import collections
 import dataclasses
 import enum
 
@@ -105,6 +106,62 @@ class Greeter(BaseOperator):
 
     def execute(self, context):
         return "hi"
+
+
+class DerivedOperator(BaseOperator):
+    def __init__(self, value, **kwargs):
+        super().__init__(**kwargs)
+        self.derived = value * 2
+
+    def execute(self, context):
+        return self.derived
+
+
+class SelfUpdatingOperator(BaseOperator):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.state = "initial"
+
+    def refresh(self):
+        self.state = "refreshed"
+        self.state = "initial"
+
+    def execute(self, context):
+        return self.state
+
+
+class NormalizingOperator(BaseOperator):
+    def __init__(self, options=None, **kwargs):
+        super().__init__(**kwargs)
+        self.options = options or {}
+
+    def execute(self, context):
+        return self.options
+
+
+class Shape(enum.Enum):
+    SQUARE = (1, 1)
+    LINE = (1, 0)
+
+
+class Key(str, enum.Enum):
+    A = "a"
+
+
+Pair = collections.namedtuple("Pair", ["left", "right"])
+
+
+class Slotted:
+    __slots__ = ("a",)
+
+    def __init__(self, a):
+        self.a = a
+
+
+class Helpers:
+    @staticmethod
+    def triple(x):
+        return x * 3
 
 
 def record(context):

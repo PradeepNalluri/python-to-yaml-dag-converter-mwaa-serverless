@@ -1,5 +1,6 @@
 import importlib
 import inspect
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
@@ -15,14 +16,24 @@ from dag_converter.cleanup import is_dag_file_module
 from dag_converter.console_config import print_warning
 from dag_converter.conversion.arguments import get_task_argument_value
 from dag_converter.conversion.dynamic_mapping import handle_dynamic_task_mapping
-from dag_converter.conversion.exceptions import InvalidOperatorError
-from dag_converter.dagbag import USER_KWARGS_ATTRIBUTE, get_assigned_attributes
+from dag_converter.conversion.exceptions import InvalidOperatorError, InvalidOperatorParameter
+from dag_converter.dagbag import (
+    USER_KWARGS_ATTRIBUTE,
+    get_assigned_attributes,
+    get_constructor_parameter_names,
+    get_init_kwargs,
+    values_differ,
+    was_created_in_dag,
+)
 from dag_converter.schema_parser import ArgumentValidator
 from dag_converter.taskflow_parser import TaskFlowAnalyzer
 
 # Constructor arguments that describe the Dag structure rather than the task. Dag context managers inject
 # these into every operator, and DagFactory rebuilds them from the YAML
 STRUCTURAL_TASK_PARAMETERS = {"dag", "task_group"}
+
+# Arguments Airflow sets from the Dag when a task is added to it
+DATE_ARGUMENTS = {"start_date", "end_date"}
 
 # Operators DagFactory creates only with a 'python_callable' from the YAML
 PYTHON_CALLABLE_OPERATORS = (PythonOperator, BranchPythonOperator, PythonSensor)
@@ -107,24 +118,26 @@ def convert_tasks(
             raise InvalidOperatorError("Operator PythonDecoratedOperator is not supported")
 
         # Only the arguments the user passed are written. DagFactory runs the operator's __init__ again, so
-        # values __init__ derived (attributes) or passed to its base class must not be written back
+        # values __init__ derived (attributes) or passed to its base class must not be written back.
+        # Explicit None is written, it overrides default_args
         for key, value in user_kwargs.items():
-            if key in STRUCTURAL_TASK_PARAMETERS or value is None or isinstance(value, ArgNotSet):
+            if key in STRUCTURAL_TASK_PARAMETERS or isinstance(value, ArgNotSet):
                 continue
             # Airflow merges Dag default_args into every operator's kwargs. Those are already in the
             # Dag's default_args, so they are only repeated on the task when overridden
-            if key in dag_default_args and value == dag_default_args[key]:
+            if key in dag_default_args and not values_differ(value, dag_default_args[key]):
                 continue
             # Skip params only if they match DAG params AND were not explicitly set
             if key == "params" and value == dag_params and not params_explicitly_set:
                 continue
             tasks[task_id][key] = get_task_argument_value(task_id, key, value)
 
-        # Attributes the Dag file assigned after creating the operator
-        for key, value in get_assigned_attributes(task).items():
-            if key in STRUCTURAL_TASK_PARAMETERS or value is None or isinstance(value, ArgNotSet):
-                continue
-            tasks[task_id][key] = get_task_argument_value(task_id, key, value)
+        if not isinstance(task, MappedOperator):
+            tasks[task_id].update(get_inherited_arguments(task, user_kwargs, dag_default_args))
+
+            # Attributes the Dag file assigned after creating the operator
+            for key, value in get_converted_assigned_attributes(task, user_kwargs, get_init_kwargs(task)).items():
+                tasks[task_id][key] = get_task_argument_value(task_id, key, value)
 
         tasks[task_id]["dependencies"] = list(getattr(task, "upstream_task_ids", []))
 
@@ -165,6 +178,75 @@ def convert_tasks(
                 del tasks[task_id]["failure_states"]
 
     return tasks
+
+
+def get_inherited_arguments(task: Operator, user_kwargs: dict[str, Any], dag_default_args: dict[str, Any]):
+    """
+    Arguments the task inherited from other sources than the Dag default_args, which the YAML would not apply:
+    TaskGroup default_args (merged with parent groups), and for operators added to the Dag after their creation,
+    the values Airflow used instead of the Dag default_args
+    """
+    parameters = get_constructor_parameter_names(type(task))
+    inherited = {}
+    if not was_created_in_dag(task):
+        # Airflow applied no default_args, DagFactory will. Keep the values the operator had
+        for key in dag_default_args:
+            if key in parameters and key not in user_kwargs and key not in DATE_ARGUMENTS:
+                inherited[key] = getattr(task, key, None)
+        return inherited
+
+    group_default_args = getattr(getattr(task, "task_group", None), "default_args", None)
+    if not isinstance(group_default_args, dict):
+        return inherited
+    for key, value in group_default_args.items():
+        if key not in parameters or key in user_kwargs or key in STRUCTURAL_TASK_PARAMETERS:
+            continue
+        if key in dag_default_args and not values_differ(value, dag_default_args[key]):
+            continue
+        inherited[key] = value
+    return inherited
+
+
+def get_converted_assigned_attributes(
+    task: Operator, user_kwargs: dict[str, Any], init_kwargs: dict[str, Any]
+) -> dict[str, Any]:
+    """
+    Attributes the Dag file assigned after creating the operator, as task arguments.
+
+    An assignment can be converted when the attribute holds the argument of the same name as passed, so
+    DagFactory passing the new value to __init__ gives the same attribute
+    """
+    parameters = get_constructor_parameter_names(type(task))
+    defaults = get_operator_defaults(type(task))
+    converted = {}
+    for key, (init_value, value) in get_assigned_attributes(task).items():
+        if key in STRUCTURAL_TASK_PARAMETERS or isinstance(value, ArgNotSet):
+            continue
+        if key not in parameters and key not in init_kwargs:
+            # The operator does not define the attribute, so it does not read it
+            if isinstance(init_value, ArgNotSet):
+                print_warning(
+                    f"Task '{task.task_id}' assigns '{key}' after creating the operator. {task.task_type} does not "
+                    "define it, ignoring it"
+                )
+                continue
+            raise InvalidOperatorParameter(
+                f"Task '{task.task_id}' assigns '{key}' after creating the operator. It is not an argument of "
+                f"{task.task_type}, so the assignment cannot be converted"
+            )
+        # The value __init__ received, including default_args and arguments of subclasses
+        passed = init_kwargs[key] if key in init_kwargs else defaults.get(key, init_value)
+        if isinstance(init_value, timedelta) and isinstance(passed, int | float) and not isinstance(passed, bool):
+            passed = timedelta(seconds=passed)
+        # __init__ normalizing None to an empty container is not a transformation
+        normalized_none = passed is None and isinstance(init_value, list | dict | set | tuple) and not init_value
+        if not normalized_none and values_differ(init_value, passed):
+            raise InvalidOperatorParameter(
+                f"Task '{task.task_id}' assigns '{key}' after creating the operator, but {task.task_type}.__init__ "
+                "transforms that argument, so the assignment cannot be converted. Pass the value to the operator"
+            )
+        converted[key] = value
+    return converted
 
 
 def warn_if_unverified_operator(task_type: str, full_operator_name: str, validator: ArgumentValidator):

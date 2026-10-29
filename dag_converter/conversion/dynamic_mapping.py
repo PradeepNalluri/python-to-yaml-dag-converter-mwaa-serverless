@@ -48,13 +48,14 @@ def handle_dynamic_task_mapping(
     if hasattr(task, "partial_kwargs"):
         # Airflow fills 'partial_kwargs' with the BaseOperator defaults and the Dag default_args.
         # Keep only the values that differ from those, i.e. the arguments the user passed to partial()
+        # The converted task gets the Dag default_args value, or the constructor default, for missing values.
+        # TaskGroup default_args differ from those, so they are kept
         partial = {
             key: value
             for key, value in task.partial_kwargs.items()
             if key not in STRUCTURAL_PARTIAL_PARAMETERS
             and key not in tasks_dict
-            and not is_default_value(value, operator_defaults.get(key))
-            and not (key in dag_default_args and value == dag_default_args[key])
+            and not is_default_value(value, dag_default_args.get(key, operator_defaults.get(key)))
         }
         tasks_dict["partial"] = get_cleanup_dag(partial)
 
@@ -68,8 +69,8 @@ def handle_dynamic_task_mapping(
 
 
 def is_default_value(value: Any, default: Any) -> bool:
-    """Check if 'value' is the constructor default. Airflow stores some None defaults as empty containers"""
-    if value is None or isinstance(value, ArgNotSet):
+    """Check if 'value' is the effective default. Airflow stores some None defaults as empty containers"""
+    if isinstance(value, ArgNotSet) or (value is None and default is None):
         return True
     if default is None and isinstance(value, list | tuple | dict | set) and not value:
         return True

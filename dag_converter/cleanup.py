@@ -9,7 +9,8 @@ from enum import Enum
 from pathlib import PurePath
 from typing import Any
 
-from airflow.sdk.definitions.param import ParamsDict
+from airflow.sdk.definitions._internal.types import ArgNotSet
+from airflow.sdk.definitions.param import Param, ParamsDict
 from airflow.sdk.definitions.xcom_arg import PlainXComArg
 from pendulum.tz.timezone import FixedTimezone
 
@@ -17,6 +18,25 @@ from dag_converter.conversion.exceptions import InvalidOperatorParameter
 
 # DagBag imports Dag files under internal module names that start with this prefix
 DAG_FILE_MODULE_PREFIX = "unusual_prefix_"
+
+# Dict keys YAML and DagFactory can represent
+KEY_TYPES = (str, int, float, bool, type(None))
+
+
+class TypedValue(dict):
+    """
+    DagFactory '__type__' object produced by the cleanup. Its contents are already cleaned, and it is told apart
+    from user dicts that contain a '__type__' key, which DagFactory would try to cast.
+    """
+
+
+def typed(type_path: str, args: list | None = None, **kwargs: Any) -> TypedValue:
+    """DagFactory object recreated as type_path(*args, **kwargs). 'args' and 'kwargs' must be cleaned"""
+    value = TypedValue(__type__=type_path)
+    if args is not None:
+        value["__args__"] = args
+    value.update(kwargs)
+    return value
 
 
 def is_dag_file_module(module_name: str) -> bool:
@@ -69,9 +89,12 @@ def get_cleanup_dag(obj: Any) -> Any:
     if isinstance(obj, str):
         return str(obj)
 
+    if isinstance(obj, TypedValue):
+        return obj
+
     # Before the primitive check, IntEnum and IntFlag members are ints
     if isinstance(obj, Enum):
-        return {"__type__": get_type_path(obj), "__args__": [obj.value]}
+        return typed(get_type_path(obj), [get_cleanup_dag(obj.value)])
 
     if is_primitive(obj):
         return obj
@@ -83,7 +106,10 @@ def get_cleanup_dag(obj: Any) -> Any:
         return re.sub(pattern, "", str(obj))
 
     if isinstance(obj, ParamsDict):
-        return obj.dump()
+        return {key: get_cleanup_dag(obj.get_param(key)) for key in obj}
+
+    if isinstance(obj, Param):
+        return get_param_value(obj)
 
     if isinstance(obj, dict):
         # Handle encoded values
@@ -93,22 +119,32 @@ def get_cleanup_dag(obj: Any) -> Any:
                 return None
             return get_cleanup_dag(obj["__var"])
 
+        if "__type__" in obj:
+            raise InvalidOperatorParameter(
+                "Dicts with a '__type__' key cannot be converted, DagFactory would create an object from them"
+            )
         # Regular dictionary
-        return {k: get_cleanup_dag(v) for k, v in obj.items()}
+        return {get_dict_key(k): get_cleanup_dag(v) for k, v in obj.items()}
 
     if isinstance(obj, list):
         return [get_cleanup_dag(item) for item in obj]
 
     # Other containers keep their type through DagFactory's '__type__', e.g. tuple([1, 2])
-    if isinstance(obj, tuple | set | frozenset):
+    if type(obj) in (tuple, set, frozenset):
         items = [get_cleanup_dag(item) for item in obj]
         if isinstance(obj, set | frozenset):
             items = sorted(items, key=repr)
-        return {"__type__": f"builtins.{type(obj).__name__}", "__args__": [items]}
+        return typed(f"builtins.{type(obj).__name__}", [items])
+
+    # Named tuples are created from their fields
+    if isinstance(obj, tuple) and hasattr(obj, "_fields"):
+        return typed(get_type_path(obj), [get_cleanup_dag(item) for item in obj])
+
+    if isinstance(obj, tuple | set | frozenset):
+        raise_unsupported_value(obj)
 
     if isinstance(obj, datetime):
         custom_object = {
-            "__type__": "datetime.datetime",
             "year": obj.year,
             "month": obj.month,
             "day": obj.day,
@@ -120,25 +156,34 @@ def get_cleanup_dag(obj: Any) -> Any:
         custom_object = {key: value for key, value in custom_object.items() if value}
         if obj.tzinfo is not None:
             custom_object["tzinfo"] = get_timezone_value(obj.tzinfo, obj)
-        return custom_object
+        # The second occurrence of a wall-clock time repeated when clocks go back
+        if obj.fold:
+            custom_object["fold"] = 1
+        return typed("datetime.datetime", **custom_object)
 
     if isinstance(obj, date):
-        return {"__type__": "datetime.date", "__args__": [obj.year, obj.month, obj.day]}
+        return typed("datetime.date", [obj.year, obj.month, obj.day])
 
     if isinstance(obj, time):
-        custom_object = {"__type__": "datetime.time", "__args__": [obj.hour, obj.minute, obj.second, obj.microsecond]}
+        custom_object = {}
         if obj.tzinfo is not None:
             custom_object["tzinfo"] = get_timezone_value(obj.tzinfo, None)
-        return custom_object
+        if obj.fold:
+            custom_object["fold"] = 1
+        return typed("datetime.time", [obj.hour, obj.minute, obj.second, obj.microsecond], **custom_object)
 
     if isinstance(obj, Decimal):
-        return {"__type__": "decimal.Decimal", "__args__": [str(obj)]}
+        return typed("decimal.Decimal", [str(obj)])
 
+    # The concrete classes are in 'pathlib._local' on Python 3.13, which older versions do not have
     if isinstance(obj, PurePath):
-        return {"__type__": get_type_path(obj), "__args__": [str(obj)]}
+        return typed(f"pathlib.{type(obj).__name__}", [str(obj)])
+
+    if isinstance(obj, tzinfo):
+        return get_timezone_value(obj, None)
 
     if isinstance(obj, timedelta):
-        return {"__type__": "datetime.timedelta", "seconds": obj.total_seconds()}
+        return typed("datetime.timedelta", seconds=obj.total_seconds())
 
     if isinstance(obj, functools.partial):
         raise InvalidOperatorParameter(
@@ -148,6 +193,13 @@ def get_cleanup_dag(obj: Any) -> Any:
 
     if callable(obj) and hasattr(obj, "__name__"):
         function_name = obj.__name__
+        # DagFactory imports callables as '<module>.<name>' with a single attribute lookup
+        qualified_name = getattr(obj, "__qualname__", function_name)
+        if function_name == "<lambda>" or "<locals>" in qualified_name or "." in qualified_name:
+            raise InvalidOperatorParameter(
+                f"Callable {qualified_name} cannot be converted. DagFactory imports callables by module and "
+                "name, so use a module-level function instead of a lambda, nested function or method"
+            )
 
         if hasattr(obj, "__module__"):
             module_name = obj.__module__
@@ -167,16 +219,38 @@ def get_cleanup_dag(obj: Any) -> Any:
     # Dataclasses are rebuilt from their __init__ fields
     if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
         init_fields = {field.name: getattr(obj, field.name) for field in dataclasses.fields(obj) if field.init}
-        return {"__type__": get_type_path(obj), **get_cleanup_dag(init_fields)}
+        return typed(get_type_path(obj), **get_cleanup_dag(init_fields))
 
-    # Other objects would be rebuilt from __dict__, which does not have to match their __init__ arguments
-    if hasattr(obj, "__dict__"):
-        raise InvalidOperatorParameter(
-            f"Value of type {obj.__module__}.{obj.__class__.__name__} cannot be converted. "
-            "Use primitive values, enums, dataclasses or datetime values"
-        )
+    # Other objects would have to be rebuilt from their attributes, which do not have to match their __init__
+    # arguments, and writing them as str would change their type
+    raise_unsupported_value(obj)
 
-    return str(obj)
+
+def raise_unsupported_value(obj: Any):
+    raise InvalidOperatorParameter(
+        f"Value of type {type(obj).__module__}.{type(obj).__qualname__} cannot be converted. Use primitive values, "
+        "containers, enums, dataclasses, named tuples, datetime values, Decimal or paths"
+    )
+
+
+def get_dict_key(key: Any) -> Any:
+    """Dict key DagFactory can load. String-valued enum keys are written as their value, which hashes the same"""
+    if isinstance(key, str) and isinstance(key, Enum):
+        return key.value
+    if isinstance(key, KEY_TYPES) and not isinstance(key, Enum):
+        return key
+    raise InvalidOperatorParameter(f"Dict key {key!r} cannot be converted. Use str, int, float or bool keys")
+
+
+def get_param_value(param: Param) -> Any:
+    """Params with a schema or description are written as Param objects to keep their validation"""
+    if not (param.schema or param.description):
+        return get_cleanup_dag(param.value)
+    args = None if isinstance(param.value, ArgNotSet) else [get_cleanup_dag(param.value)]
+    kwargs = get_cleanup_dag(dict(param.schema))
+    if param.description:
+        kwargs["description"] = param.description
+    return typed(get_type_path(param), args, **kwargs)
 
 
 def get_timezone_name(tz: tzinfo, dt: datetime | None) -> str | int:
@@ -192,9 +266,9 @@ def get_timezone_name(tz: tzinfo, dt: datetime | None) -> str | int:
     return "UTC" if not offset else int(offset.total_seconds())
 
 
-def get_timezone_value(tz: tzinfo, dt: datetime | None) -> dict[str, Any]:
+def get_timezone_value(tz: tzinfo, dt: datetime | None) -> TypedValue:
     """DagFactory '__type__' object that recreates the timezone"""
-    return {"__type__": "pendulum.timezone", "__args__": [get_timezone_name(tz, dt)]}
+    return typed("pendulum.timezone", [get_timezone_name(tz, dt)])
 
 
 def is_primitive(obj: Any) -> bool:

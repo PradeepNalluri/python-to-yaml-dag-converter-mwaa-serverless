@@ -40,10 +40,13 @@ Review the converted Dags in the `output_yaml` folder in the current directory
 ## Limitations
 * Operators outside the verified list in `validator_schema.yaml` are converted with a warning. Their provider packages must be installed where the converter runs
 * Behavior that is not supported in `dag-factory` will not be converted
-* Dynamic task mapping conversion is not supported
+* Dynamic task mapping with `expand_kwargs` is not supported
 * Operators and argument classes must be importable where the YAML Dag runs. Classes defined in the Dag file are rejected
-* `expand_kwargs`, `functools.partial` values, more than one callback per callback argument, and objects other than enums, dataclasses and datetime values are rejected
-* Dag arguments `dag-factory` does not pass to the Dag are rejected when set: `user_defined_macros`, `user_defined_filters`, `fail_fast`, `fail_stop`, `max_consecutive_failed_dag_runs`, `owner_links`, `jinja_environment_kwargs`, `template_undefined`
+* Callables must be module-level functions. Lambdas, nested functions, methods and `functools.partial` values are rejected, and so is more than one callback per callback argument
+* Values must be primitives, containers, enums, dataclasses, named tuples, datetime values, `Decimal` or paths. Other objects are rejected
+* Attributes assigned after creating an operator are converted when they are arguments of the operator that `__init__` stores as passed. Other assignments are rejected, or ignored with a warning when the operator does not define the attribute
+* Schedules: cron strings, `CronTriggerTimetable` and `CronDataIntervalTimetable` are supported
+* Dag arguments `dag-factory` does not pass to the Dag are rejected when set: `user_defined_macros`, `user_defined_filters`, `fail_fast`, `fail_stop`, `auto_register`, `disable_bundle_versioning`, `max_consecutive_failed_dag_runs`, `owner_links`, `jinja_environment_kwargs`, `template_undefined`
 * PythonOperator, BranchPythonOperator and PythonSensor subclasses that set `python_callable` themselves are rejected, because `dag-factory` requires `python_callable` in the YAML
 
 ## Examples

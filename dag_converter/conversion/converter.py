@@ -1,17 +1,18 @@
+import functools
 import inspect
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from airflow.models.dag import DAG
-from airflow.sdk.definitions._internal.types import ArgNotSet
 from airflow.sdk.definitions.param import Param
 
-from dag_converter.cleanup import get_timezone_name, get_type_path
-from dag_converter.conversion.arguments import get_dag_argument_value
+from dag_converter.cleanup import get_param_value, get_timezone_name
+from dag_converter.conversion.arguments import DAG_ARGUMENTS_IGNORED_BY_DAGFACTORY, get_dag_argument_value
 from dag_converter.conversion.default_args import convert_default_args
 from dag_converter.conversion.schedule import convert_schedule
 from dag_converter.conversion.tasks import convert_tasks
+from dag_converter.dagbag import values_differ
 from dag_converter.schema_parser import ArgumentValidator
 from dag_converter.taskflow_parser import TaskFlowAnalyzer
 
@@ -53,8 +54,14 @@ def is_dag_default_value(key: str, value, dag_defaults: dict) -> bool:
     return value == default_value
 
 
+@functools.cache
+def get_reference_dag() -> DAG:
+    """Dag with every argument at its default"""
+    return DAG(dag_id="dag_converter_reference", schedule=None)
+
+
 def convert_params(dag_object: DAG) -> dict[str, Any]:
-    """Dag params. Params with a schema or description are written as Param objects to keep their validation"""
+    """Dag params. Params with a schema or description keep it, see get_param_value"""
     params_obj = getattr(dag_object, "params", None)
     params_dict = {}
     if not params_obj or not hasattr(params_obj, "items"):
@@ -62,18 +69,7 @@ def convert_params(dag_object: DAG) -> dict[str, Any]:
     get_param = getattr(params_obj, "get_param", None)
     for key, value in params_obj.items():
         param = get_param(key) if get_param else value
-        if not isinstance(param, Param):
-            params_dict[key] = value
-        elif param.schema or param.description:
-            converted = {"__type__": get_type_path(param)}
-            if not isinstance(param.value, ArgNotSet):
-                converted["__args__"] = [param.value]
-            converted.update(param.schema)
-            if param.description:
-                converted["description"] = param.description
-            params_dict[key] = converted
-        else:
-            params_dict[key] = param.value
+        params_dict[key] = get_param_value(param) if isinstance(param, Param) else value
     return params_dict
 
 
@@ -145,6 +141,15 @@ def get_converted_format(
                 value = get_dag_argument_value(key, value)
                 if value is not None:
                     converted_dag[dag_id][key] = value
+
+    # Set Dag arguments DagFactory drops, also when the schema does not list them. Compared with a Dag created
+    # without arguments, since attrs defaults are not in the signature
+    if isinstance(dag_object, DAG):
+        reference_dag = get_reference_dag()
+        for key in DAG_ARGUMENTS_IGNORED_BY_DAGFACTORY:
+            value = getattr(dag_object, key, None)
+            if key not in converted_dag[dag_id] and values_differ(value, getattr(reference_dag, key, None)):
+                get_dag_argument_value(key, value)
 
     convert_dag_timezone(dag_object, converted_dag[dag_id])
 

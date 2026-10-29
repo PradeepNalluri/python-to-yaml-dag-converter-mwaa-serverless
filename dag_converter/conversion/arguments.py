@@ -6,6 +6,8 @@ from dag_converter.conversion.exceptions import InvalidDagParameter, InvalidOper
 
 # Dag arguments DagFactory 1.0 does not pass to the Dag, so they would be dropped
 DAG_ARGUMENTS_IGNORED_BY_DAGFACTORY = {
+    "auto_register",
+    "disable_bundle_versioning",
     "fail_fast",
     "fail_stop",
     "jinja_environment_kwargs",
@@ -37,7 +39,7 @@ def get_dag_argument_value(key: str, value: Any) -> Any:
     Returns None for empty arguments DagFactory ignores.
     """
     if key in DAG_ARGUMENTS_IGNORED_BY_DAGFACTORY:
-        if not value:
+        if value is None or (isinstance(value, dict | list | tuple | set) and not value):
             return None
         raise InvalidDagParameter(f"Dag argument '{key}' is not supported by DagFactory, which would drop it")
     return get_single_callback("Dag", key, value, InvalidDagParameter)

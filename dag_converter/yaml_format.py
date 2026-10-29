@@ -2,6 +2,8 @@ from typing import Any
 
 import yaml
 
+from dag_converter.cleanup import TypedValue
+
 
 def build_yaml(cleaned_data: dict[str, Any]) -> str:
     """Build the Yaml from the dictionary"""
@@ -23,6 +25,7 @@ def build_yaml(cleaned_data: dict[str, Any]) -> str:
 
     CustomDumper.add_representer(str, str_presenter)
     CustomDumper.add_representer(dict, dict_presenter)
+    CustomDumper.add_representer(TypedValue, dict_presenter)
 
     try:
         return yaml.dump(cleaned_data, Dumper=CustomDumper, default_flow_style=False, sort_keys=False)
