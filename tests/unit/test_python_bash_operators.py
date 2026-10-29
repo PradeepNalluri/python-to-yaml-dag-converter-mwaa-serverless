@@ -11,9 +11,7 @@ from dag_converter.static_validator import extract_operator_types, validate_file
 SCHEMA_FILE = Path(__file__).parent.parent.parent / "dag_converter" / "validator_schema.yaml"
 
 
-class TestPythonOperatorValidation(unittest.TestCase):
-    """Test that PythonOperator passes static validation."""
-
+class OperatorValidationTestCase(unittest.TestCase):
     def setUp(self):
         self.validator = ArgumentValidator(SCHEMA_FILE)
 
@@ -21,6 +19,10 @@ class TestPythonOperatorValidation(unittest.TestCase):
         with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
             f.write(content)
             return Path(f.name)
+
+
+class TestPythonOperatorValidation(OperatorValidationTestCase):
+    """Test that PythonOperator passes static validation."""
 
     def test_python_operator_standard_provider_accepted(self):
         """Test that airflow.providers.standard.operators.python.PythonOperator is allowed."""
@@ -72,16 +74,8 @@ task = PythonOperator(task_id="test", python_callable=lambda: None)
             os.unlink(file_path)
 
 
-class TestBashOperatorValidation(unittest.TestCase):
+class TestBashOperatorValidation(OperatorValidationTestCase):
     """Test that BashOperator passes static validation."""
-
-    def setUp(self):
-        self.validator = ArgumentValidator(SCHEMA_FILE)
-
-    def _create_file(self, content):
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
-            f.write(content)
-            return Path(f.name)
 
     def test_bash_operator_standard_provider_accepted(self):
         """Test that airflow.providers.standard.operators.bash.BashOperator is allowed."""
@@ -130,16 +124,8 @@ task = BashOperator(task_id="test", bash_command="echo hello")
             os.unlink(file_path)
 
 
-class TestMixedOperatorValidation(unittest.TestCase):
+class TestMixedOperatorValidation(OperatorValidationTestCase):
     """Test files with both PythonOperator and BashOperator."""
-
-    def setUp(self):
-        self.validator = ArgumentValidator(SCHEMA_FILE)
-
-    def _create_file(self, content):
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
-            f.write(content)
-            return Path(f.name)
 
     def test_validate_file_with_both_operators(self):
         """Test that a file using both PythonOperator and BashOperator passes validation."""
