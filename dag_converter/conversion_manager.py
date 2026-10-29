@@ -138,23 +138,8 @@ class ConversionManager:
             )
         written_outputs[output_path] = dag_file_path
 
-        # Output task attributes to intermediate file for debugging DagBag attributes
         if debug:
-            with open(Path(__file__).parent / TASK_ATTRIBUTES_FILE, "w+") as f:
-                for attr_name, attr_value in vars(dag_object).items():
-                    f.write(f"{attr_name}: {attr_value}\n")
-                f.write("\n")
-                for task in dag_object.tasks:
-                    f.write(f"Task: {task.task_id}\n")
-                    for attr_name, attr_value in vars(task).items():
-                        f.write(f"  {attr_name}: {attr_value}\n")
-                    for attr_name in dir(task):
-                        try:
-                            attr_value = getattr(task, attr_name)
-                            f.write(f"  {attr_name}: {attr_value}\n")
-                        except Exception as e:
-                            f.write(f"  {attr_name}: <Error accessing attribute: {e}>\n")
-                    f.write("\n")
+            self._write_debug_attributes(dag_object)
 
         taskflow_parser = TaskFlowAnalyzer(dag_file_path)
         dag_formatted = get_converted_format(taskflow_parser, dag_object, dag_file_path, validator)
@@ -162,7 +147,6 @@ class ConversionManager:
         dag_yaml = build_yaml(dag_cleaned)
 
         # Validation with Dag Factory
-        is_valid = True
         if user_validate:
             print_progress("Validating YAML...")
 
@@ -177,21 +161,37 @@ class ConversionManager:
                     f.write(str(dag_yaml))
                 print_info(f"YAML written to {output_path} despite validation failure")
                 raise Exception(f"Validation failed: {message}")
-            else:
-                print_success("YAML validation successful, no errors found")
+            print_success("YAML validation successful, no errors found")
 
-        if is_valid:
-            # Output Yaml upon success
-            if output_path:
-                with open(output_path, "w") as f:
-                    f.write(str(dag_yaml))
-                print_success(f"YAML written to {output_path}")
+        # Output Yaml upon success
+        with open(output_path, "w") as f:
+            f.write(str(dag_yaml))
+        print_success(f"YAML written to {output_path}")
 
-            if self.s3_bucket:
-                self._upload_to_s3(output_path.name, output_path)
+        if self.s3_bucket:
+            self._upload_to_s3(output_path.name, output_path)
 
         print_info("\n\n----------------------------------------------------------------------------------\n\n")
         return dag_yaml
+
+    @staticmethod
+    def _write_debug_attributes(dag_object):
+        """Output task attributes to intermediate file for debugging DagBag attributes"""
+        with open(Path(__file__).parent / TASK_ATTRIBUTES_FILE, "w+") as f:
+            for attr_name, attr_value in vars(dag_object).items():
+                f.write(f"{attr_name}: {attr_value}\n")
+            f.write("\n")
+            for task in dag_object.tasks:
+                f.write(f"Task: {task.task_id}\n")
+                for attr_name, attr_value in vars(task).items():
+                    f.write(f"  {attr_name}: {attr_value}\n")
+                for attr_name in dir(task):
+                    try:
+                        attr_value = getattr(task, attr_name)
+                        f.write(f"  {attr_name}: {attr_value}\n")
+                    except Exception as e:
+                        f.write(f"  {attr_name}: <Error accessing attribute: {e}>\n")
+                f.write("\n")
 
     def _upload_to_s3(self, dag_file_name: str, output_path: Path):
         """
