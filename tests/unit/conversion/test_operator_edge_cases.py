@@ -266,6 +266,9 @@ class TestValidationRound2(DagConversionTestCase):
             "naive": "pendulum.naive(2024, 1, 2, 3)",
             "date": "pendulum.date(2024, 1, 2)",
             "duration": "pendulum.duration(hours=2, minutes=5)",
+            # N3: months and years are calendar units, intervals keep their start and end
+            "months": "pendulum.duration(months=1, days=2)",
+            "years": "pendulum.duration(years=1, hours=3, microseconds=5)",
         }
         tasks = "\n    ".join(f"PayloadOperator(task_id='{key}', payload={value})" for key, value in values.items())
 
@@ -277,6 +280,17 @@ class TestValidationRound2(DagConversionTestCase):
             self.assertIs(type(b), type(a))
             if task_id == "naive":
                 self.assertEqual(b.fold, a.fold)
+            if task_id in ("months", "years"):
+                self.assertEqual((b.years, b.months, b.remaining_days), (a.years, a.months, a.remaining_days))
+
+
+    def test_pendulum_interval_is_rejected(self):
+        """DagFactory deep-copies its configuration, which fails for Interval"""
+        with self.assertRaisesRegex(InvalidOperatorParameter, "Interval"):
+            self.convert_dag(
+                tasks="PayloadOperator(task_id='p', payload=pendulum.interval("
+                "pendulum.datetime(2024, 1, 1), pendulum.datetime(2024, 3, 1)))"
+            )
 
 
 class TestSchedules(DagConversionTestCase):

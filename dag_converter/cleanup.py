@@ -196,9 +196,25 @@ def get_cleanup_dag(obj: Any) -> Any:
     if isinstance(obj, tzinfo):
         return get_timezone_value(obj, None)
 
+    # DagFactory deep-copies the loaded configuration, which pendulum Intervals do not support
+    if isinstance(obj, pendulum.Interval):
+        raise InvalidOperatorParameter(
+            "pendulum Interval values cannot be converted, DagFactory cannot copy them. Pass the start and end "
+            "datetimes instead"
+        )
+
+    # Durations keep years and months as calendar units. In total seconds they would be fixed numbers of days
+    if isinstance(obj, pendulum.Duration):
+        calendar_seconds = pendulum.duration(years=obj.years, months=obj.months).total_seconds()
+        return typed(
+            "pendulum.duration",
+            years=obj.years,
+            months=obj.months,
+            seconds=obj.total_seconds() - calendar_seconds,
+        )
+
     if isinstance(obj, timedelta):
-        duration_type = "pendulum.duration" if isinstance(obj, pendulum.Duration) else "datetime.timedelta"
-        return typed(duration_type, seconds=obj.total_seconds())
+        return typed("datetime.timedelta", seconds=obj.total_seconds())
 
     if isinstance(obj, functools.partial):
         raise InvalidOperatorParameter(
