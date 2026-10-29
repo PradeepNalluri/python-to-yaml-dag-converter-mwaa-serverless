@@ -3,10 +3,16 @@ example_emr_notebook:
   params: {}
   default_args:
     start_date:
-      __type__: datetime.datetime
-      year: 2026
-      month: 1
-      day: 1
+      __type__: pendulum.naive
+      __args__:
+      - 2026
+      - 1
+      - 1
+      - 0
+      - 0
+      - 0
+      - 0
+      fold: 0
   schedule: '@once'
   tasks:
     start_execution:
@@ -35,8 +41,8 @@ example_emr_notebook:
       notebook_execution_id: "{{ task_instance.xcom_pull(task_ids='start_execution',\
         \ key='return_value') }}"
       dependencies:
-      - wait_for_execution_start
       - start_execution
+      - wait_for_execution_start
     wait_for_execution_stop:
       operator: airflow.providers.amazon.aws.sensors.emr.EmrNotebookExecutionSensor
       task_id: wait_for_execution_stop
@@ -70,8 +76,14 @@ example_emr_notebook:
   catchup: false
   dag_display_name: example_emr_notebook
   start_date:
-    __type__: datetime.datetime
-    year: 2026
-    month: 1
-    day: 1
+    __type__: pendulum.naive
+    __args__:
+    - 2026
+    - 1
+    - 1
+    - 0
+    - 0
+    - 0
+    - 0
+    fold: 0
   tags: []

@@ -4,10 +4,16 @@ dynamic_dag_sales:
   default_args:
     owner: airflow
     start_date:
-      __type__: datetime.datetime
-      year: 2026
-      month: 1
-      day: 1
+      __type__: pendulum.naive
+      __args__:
+      - 2026
+      - 1
+      - 1
+      - 0
+      - 0
+      - 0
+      - 0
+      fold: 0
     retries: 1
     retry_delay:
       __type__: datetime.timedelta
@@ -49,14 +55,20 @@ dynamic_dag_sales:
       bash_command: "echo 'Completed processing for sales'"
       dependencies:
       - process_transactions
-      - process_customers
       - process_products
+      - process_customers
   catchup: false
   dag_display_name: dynamic_dag_sales
   description: Dynamically generated DAG for sales
   start_date:
-    __type__: datetime.datetime
-    year: 2026
-    month: 1
-    day: 1
+    __type__: pendulum.naive
+    __args__:
+    - 2026
+    - 1
+    - 1
+    - 0
+    - 0
+    - 0
+    - 0
+    fold: 0
   tags: []

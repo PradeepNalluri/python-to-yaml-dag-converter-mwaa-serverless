@@ -11,7 +11,7 @@ example_sagemaker_unified_studio_notebook:
       notebook_identifier: NOTEBOOK_ID
       domain_identifier: DOMAIN_ID
       owning_project_identifier: PROJECT_ID
-      client_token: idempotency-token-1793281208
+      client_token: idempotency-token-1793282523
       notebook_parameters:
         param1: value1
         param2: value2
@@ -64,8 +64,14 @@ example_sagemaker_unified_studio_notebook:
   catchup: false
   dag_display_name: example_sagemaker_unified_studio_notebook
   start_date:
-    __type__: datetime.datetime
-    year: 2021
-    month: 1
-    day: 1
+    __type__: pendulum.naive
+    __args__:
+    - 2021
+    - 1
+    - 1
+    - 0
+    - 0
+    - 0
+    - 0
+    fold: 0
   tags: []

@@ -3,10 +3,15 @@ example_glue:
   params: {}
   default_args:
     start_date:
-      __type__: datetime.datetime
-      year: 2026
-      month: 7
-      day: 15
+      __type__: pendulum.naive
+      __args__:
+      - 2026
+      - 7
+      - 15
+      - 0
+      - 0
+      - 0
+      - 0
       fold: 1
   schedule: '@daily'
   tasks:
@@ -108,9 +113,14 @@ example_glue:
   catchup: false
   dag_display_name: example_glue
   start_date:
-    __type__: datetime.datetime
-    year: 2026
-    month: 7
-    day: 15
+    __type__: pendulum.naive
+    __args__:
+    - 2026
+    - 7
+    - 15
+    - 0
+    - 0
+    - 0
+    - 0
     fold: 1
   tags: []

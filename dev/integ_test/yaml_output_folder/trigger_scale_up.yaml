@@ -3,10 +3,15 @@ trigger_scale_up:
   params: {}
   default_args:
     start_date:
-      __type__: datetime.datetime
-      year: 2026
-      month: 1
-      day: 1
+      __type__: pendulum.naive
+      __args__:
+      - 2026
+      - 1
+      - 1
+      - 0
+      - 0
+      - 0
+      - 0
       fold: 1
   schedule: 0,30 * * * *
   tasks: {}
@@ -14,9 +19,14 @@ trigger_scale_up:
   dag_display_name: trigger_scale_up
   is_paused_upon_creation: false
   start_date:
-    __type__: datetime.datetime
-    year: 2026
-    month: 1
-    day: 1
+    __type__: pendulum.naive
+    __args__:
+    - 2026
+    - 1
+    - 1
+    - 0
+    - 0
+    - 0
+    - 0
     fold: 1
   tags: []

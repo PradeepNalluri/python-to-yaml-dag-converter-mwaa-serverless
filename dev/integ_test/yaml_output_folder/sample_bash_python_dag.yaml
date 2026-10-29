@@ -5,10 +5,16 @@ sample_bash_python_dag:
     owner: airflow
     depends_on_past: false
     start_date:
-      __type__: datetime.datetime
-      year: 2026
-      month: 1
-      day: 1
+      __type__: pendulum.naive
+      __args__:
+      - 2026
+      - 1
+      - 1
+      - 0
+      - 0
+      - 0
+      - 0
+      fold: 0
     email_on_failure: false
     email_on_retry: false
     retries: 1
@@ -44,8 +50,14 @@ sample_bash_python_dag:
   dag_display_name: sample_bash_python_dag
   description: A sample DAG with Bash and Python operators
   start_date:
-    __type__: datetime.datetime
-    year: 2026
-    month: 1
-    day: 1
+    __type__: pendulum.naive
+    __args__:
+    - 2026
+    - 1
+    - 1
+    - 0
+    - 0
+    - 0
+    - 0
+    fold: 0
   tags: []

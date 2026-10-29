@@ -3,10 +3,16 @@ test-dag:
   params: {}
   default_args:
     start_date:
-      __type__: datetime.datetime
-      year: 2026
-      month: 12
-      day: 1
+      __type__: pendulum.naive
+      __args__:
+      - 2026
+      - 12
+      - 1
+      - 0
+      - 0
+      - 0
+      - 0
+      fold: 0
   schedule: '@once'
   tasks:
     task0-0:
@@ -42,8 +48,14 @@ test-dag:
   dag_display_name: test-dag
   is_paused_upon_creation: false
   start_date:
-    __type__: datetime.datetime
-    year: 2026
-    month: 12
-    day: 1
+    __type__: pendulum.naive
+    __args__:
+    - 2026
+    - 12
+    - 1
+    - 0
+    - 0
+    - 0
+    - 0
+    fold: 0
   tags: []

@@ -6,10 +6,15 @@ startup_script_test:
     depends_on_past: false
     retries: 0
     start_date:
-      __type__: datetime.datetime
-      year: 2026
-      month: 1
-      day: 1
+      __type__: pendulum.naive
+      __args__:
+      - 2026
+      - 1
+      - 1
+      - 0
+      - 0
+      - 0
+      - 0
       fold: 1
   schedule: '@once'
   tasks:
@@ -22,9 +27,14 @@ startup_script_test:
   dag_display_name: startup_script_test
   is_paused_upon_creation: false
   start_date:
-    __type__: datetime.datetime
-    year: 2026
-    month: 1
-    day: 1
+    __type__: pendulum.naive
+    __args__:
+    - 2026
+    - 1
+    - 1
+    - 0
+    - 0
+    - 0
+    - 0
     fold: 1
   tags: []
