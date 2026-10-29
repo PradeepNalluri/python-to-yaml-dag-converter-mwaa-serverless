@@ -6,10 +6,8 @@ from airflow.sdk.definitions._internal.expandinput import ListOfDictsExpandInput
 from airflow.utils.types import ArgNotSet
 
 from dag_converter.cleanup import get_cleanup_dag
+from dag_converter.conversion.arguments import STRUCTURAL_TASK_PARAMETERS, unwrap_callbacks
 from dag_converter.conversion.exceptions import InvalidOperatorError
-
-# Constructor arguments that describe the Dag structure rather than the task
-STRUCTURAL_PARTIAL_PARAMETERS = {"dag", "task_group"}
 
 
 def handle_dynamic_task_mapping(
@@ -53,7 +51,7 @@ def handle_dynamic_task_mapping(
         partial = {
             key: value
             for key, value in task.partial_kwargs.items()
-            if key not in STRUCTURAL_PARTIAL_PARAMETERS
+            if key not in STRUCTURAL_TASK_PARAMETERS
             and key not in tasks_dict
             and not is_default_value(
                 unwrap_callbacks(key, value),
@@ -73,13 +71,6 @@ def handle_dynamic_task_mapping(
             tasks_dict["python_callable"] = tasks_dict["partial"].pop("python_callable")
         if not tasks_dict["partial"]:
             del tasks_dict["partial"]
-
-
-def unwrap_callbacks(key: str, value: Any) -> Any:
-    """Airflow stores callbacks of mapped tasks as lists, the Dag default_args may hold a single callable"""
-    if key.endswith("_callback") and isinstance(value, list | tuple) and len(value) <= 1:
-        return value[0] if value else None
-    return value
 
 
 def is_default_value(value: Any, default: Any) -> bool:

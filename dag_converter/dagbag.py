@@ -33,18 +33,26 @@ CREATED_IN_DAG_ATTRIBUTE = "_dag_converter_created_in_dag"
 AIRFLOW_MANAGED_ATTRIBUTES = {"upstream_task_ids", "downstream_task_ids", "task_group", "dag", "start_date", "end_date"}
 
 
+def _get_init_parameters(operator_class: type) -> Iterator[inspect.Parameter]:
+    """Parameters of every __init__ in the class MRO, base classes first"""
+    for cls in reversed(operator_class.__mro__):
+        try:
+            yield from inspect.signature(cls.__init__).parameters.values()
+        except (TypeError, ValueError):
+            continue
+
+
 @functools.cache
 def get_constructor_parameter_names(operator_class: type) -> frozenset[str]:
     """Names of the named parameters of every __init__ in the class MRO"""
-    names = set()
-    for cls in operator_class.__mro__:
-        try:
-            parameters = inspect.signature(cls.__init__).parameters.values()
-        except (TypeError, ValueError):
-            continue
-        names.update(p.name for p in parameters if p.kind not in (p.VAR_POSITIONAL, p.VAR_KEYWORD))
+    names = {p.name for p in _get_init_parameters(operator_class) if p.kind not in (p.VAR_POSITIONAL, p.VAR_KEYWORD)}
     names.discard("self")
     return frozenset(names)
+
+
+def get_operator_defaults(operator_class: type) -> dict[str, Any]:
+    """Returns the constructor default of every parameter of 'operator_class', following the class MRO"""
+    return {p.name: p.default for p in _get_init_parameters(operator_class) if p.default is not p.empty}
 
 
 def values_differ(a: Any, b: Any) -> bool:

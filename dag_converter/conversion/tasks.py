@@ -1,5 +1,3 @@
-import importlib
-import inspect
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
@@ -14,7 +12,7 @@ from airflow.utils.types import NOTSET, ArgNotSet
 
 from dag_converter.cleanup import is_dag_file_module
 from dag_converter.console_config import print_warning
-from dag_converter.conversion.arguments import get_task_argument_value
+from dag_converter.conversion.arguments import STRUCTURAL_TASK_PARAMETERS, get_task_argument_value
 from dag_converter.conversion.dynamic_mapping import handle_dynamic_task_mapping
 from dag_converter.conversion.exceptions import InvalidOperatorError, InvalidOperatorParameter
 from dag_converter.dagbag import (
@@ -22,15 +20,12 @@ from dag_converter.dagbag import (
     get_assigned_attributes,
     get_constructor_parameter_names,
     get_init_kwargs,
+    get_operator_defaults,
     values_differ,
     was_created_in_dag,
 )
 from dag_converter.schema_parser import ArgumentValidator
 from dag_converter.taskflow_parser import TaskFlowAnalyzer
-
-# Constructor arguments that describe the Dag structure rather than the task. Dag context managers inject
-# these into every operator, and DagFactory rebuilds them from the YAML
-STRUCTURAL_TASK_PARAMETERS = {"dag", "task_group"}
 
 # Arguments Airflow sets from the Dag when a task is added to it
 DATE_ARGUMENTS = {"start_date", "end_date"}
@@ -226,10 +221,10 @@ def get_converted_assigned_attributes(
     for key, (init_value, value) in get_assigned_attributes(task).items():
         if key in STRUCTURAL_TASK_PARAMETERS or isinstance(value, ArgNotSet):
             continue
-        if key not in parameters and key not in init_kwargs and reads_keyword_argument(task, user_kwargs, key, value):
-            converted[key] = value
-            continue
         if key not in parameters and key not in init_kwargs:
+            if reads_keyword_argument(task, user_kwargs, key, value):
+                converted[key] = value
+                continue
             # The operator does not define the attribute, so it does not read it
             if isinstance(init_value, ArgNotSet):
                 print_warning(
@@ -283,54 +278,3 @@ def warn_if_unverified_operator(task_type: str, full_operator_name: str, validat
         return
     if full_operator_name not in validator.get_allowed_operators():
         print_warning(f"Operator {task_type} has not been verified for conversion, converting anyway")
-
-
-def get_operator_defaults(operator_class: type) -> dict[str, Any]:
-    """Returns the constructor default of every parameter of 'operator_class', following the class MRO"""
-    defaults = {}
-    for cls in reversed(operator_class.__mro__):
-        try:
-            parameters = inspect.signature(cls.__init__).parameters
-        except (TypeError, ValueError):
-            continue
-        for name, parameter in parameters.items():
-            if parameter.default is not inspect.Parameter.empty:
-                defaults[name] = parameter.default
-    return defaults
-
-
-def get_operator_parameters(operator_class_or_string: type[Operator] | str) -> list[str]:
-    """
-    Returns a list of all allowed parameters for a given operator.
-
-    Args:
-        operator_class_or_string: Either the operator class or a string like
-                                 'airflow.providers.amazon.aws.operators.ec2.EC2TerminateInstanceOperator'
-
-    Returns:
-        list: List of parameter names that the operator accepts
-    """
-    # If it's a string, import the class
-    if isinstance(operator_class_or_string, str):
-        module_path, class_name = operator_class_or_string.rsplit(".", 1)
-        try:
-            module = importlib.import_module(module_path)
-            operator_class = getattr(module, class_name)
-        except (ImportError, AttributeError):
-            return []
-    else:
-        operator_class = operator_class_or_string
-
-    all_params = []
-
-    for cls in operator_class.__mro__:
-        if hasattr(cls, "__init__"):
-            try:
-                sig = inspect.signature(cls.__init__)
-                params = [name for name in sig.parameters if name not in ["self", "args", "kwargs"]]
-                all_params.extend(params)
-            except Exception:
-                continue
-
-    # Remove duplicates while preserving order
-    return list(dict.fromkeys(all_params))

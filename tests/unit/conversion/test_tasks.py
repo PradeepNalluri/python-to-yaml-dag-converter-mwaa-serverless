@@ -1,9 +1,12 @@
 import unittest
 from unittest.mock import Mock, patch
 
+from airflow.providers.amazon.aws.operators.s3 import S3CreateBucketOperator
+from airflow.providers.standard.operators.empty import EmptyOperator
 from airflow.sdk.definitions.mappedoperator import MappedOperator
 
-from dag_converter.conversion.tasks import convert_tasks, get_operator_parameters
+from dag_converter.conversion.tasks import convert_tasks
+from dag_converter.dagbag import get_constructor_parameter_names
 
 
 class TestConvertTasks(unittest.TestCase):
@@ -13,11 +16,9 @@ class TestConvertTasks(unittest.TestCase):
         self.mock_dag_object = Mock()
         self.mock_dag_object.params = {}
 
-    @patch("dag_converter.conversion.tasks.get_operator_parameters")
-    def test_basic_task_conversion(self, mock_get_params):
+    def test_basic_task_conversion(self):
         """Test basic task conversion"""
         # Setup mocks
-        mock_get_params.return_value = ["param1", "retries"]
         self.mock_validator.validate_field.return_value = True
 
         # Create mock task
@@ -51,10 +52,8 @@ class TestConvertTasks(unittest.TestCase):
 
     @patch("dag_converter.conversion.tasks.get_operator_defaults", return_value={})
     @patch("dag_converter.conversion.tasks.handle_dynamic_task_mapping")
-    @patch("dag_converter.conversion.tasks.get_operator_parameters")
-    def test_dynamic_task_mapping(self, mock_get_params, mock_handle_dtm, mock_defaults):
+    def test_dynamic_task_mapping(self, mock_handle_dtm, mock_defaults):
         """Test dynamic task mapping handling"""
-        mock_get_params.return_value = ["param1"]
         self.mock_validator.validate_field.return_value = True
 
         task = Mock(spec=MappedOperator)
@@ -74,10 +73,8 @@ class TestConvertTasks(unittest.TestCase):
         mock_handle_dtm.assert_called()
 
     @patch("dag_converter.conversion.tasks.get_operator_defaults", return_value={})
-    @patch("dag_converter.conversion.tasks.get_operator_parameters")
-    def test_task_module_handling(self, mock_get_params, mock_defaults):
+    def test_task_module_handling(self, mock_defaults):
         """Test _task_module attribute handling"""
-        mock_get_params.return_value = ["param1"]
         self.mock_validator.validate_field.return_value = True
 
         task = Mock(spec=MappedOperator)
@@ -99,10 +96,8 @@ class TestConvertTasks(unittest.TestCase):
 
         self.assertEqual(result["dtm_task"]["operator"], "airflow.operators.bash.BashOperator")
 
-    @patch("dag_converter.conversion.tasks.get_operator_parameters")
-    def test_special_operator_cleanup(self, mock_get_params):
+    def test_special_operator_cleanup(self):
         """Test special operator field cleanup"""
-        mock_get_params.return_value = ["flow_update", "config"]
 
         def validate_side_effect(section, key, value):
             return key in ["flow_update", "config"]
@@ -141,10 +136,8 @@ class TestConvertTasks(unittest.TestCase):
         # config should be removed from sagemaker task
         self.assertNotIn("config", result["sagemaker_task"])
 
-    @patch("dag_converter.conversion.tasks.get_operator_parameters")
-    def test_skip_dtm_keywords(self, mock_get_params):
+    def test_skip_dtm_keywords(self):
         """Test skipping DTM keywords"""
-        mock_get_params.return_value = ["op_kwargs_expand_input", "expand_input", "partial_kwargs", "param1"]
         self.mock_validator.validate_field.return_value = True
 
         task = Mock()
@@ -175,18 +168,13 @@ class TestConvertTasks(unittest.TestCase):
         self.assertIn("param1", result["test_task"])
 
 
-class TestGetOperatorParameters(unittest.TestCase):
-    """Test cases for the get_operator_parameters function"""
+class TestOperatorParameters(unittest.TestCase):
+    """Test cases for operator constructor parameters and task params"""
 
     def test_s3_operator_parameters(self):
-        """Test that get_operator_parameters returns expected parameters for S3Operator"""
+        """Test that get_constructor_parameter_names returns expected parameters for S3Operator"""
         # Test with S3CreateBucketOperator as an example S3 operator
-        operator_string = "airflow.providers.amazon.aws.operators.s3.S3CreateBucketOperator"
-
-        parameters = get_operator_parameters(operator_string)
-
-        # Verify that the function returns a list
-        self.assertIsInstance(parameters, list)
+        parameters = get_constructor_parameter_names(S3CreateBucketOperator)
 
         # Verify that common S3 operator parameters are included
         expected_params = ["bucket_name", "aws_conn_id", "region_name"]
@@ -199,13 +187,8 @@ class TestGetOperatorParameters(unittest.TestCase):
             self.assertIn(param, parameters, f"Basic parameter '{param}' should be in operator parameters")
 
     def test_empty_operator_parameters(self):
-        """Test that get_operator_parameters returns expected parameters for EmptyOperator"""
-        operator_string = "airflow.providers.standard.operators.empty.EmptyOperator"
-
-        parameters = get_operator_parameters(operator_string)
-
-        # Verify that the function returns a list
-        self.assertIsInstance(parameters, list)
+        """Test that get_constructor_parameter_names returns expected parameters for EmptyOperator"""
+        parameters = get_constructor_parameter_names(EmptyOperator)
 
         # Verify that basic operator parameters are included
         expected_params = ["task_id", "retries", "retry_delay", "depends_on_past", "wait_for_downstream"]
@@ -215,10 +198,8 @@ class TestGetOperatorParameters(unittest.TestCase):
         # Verify that the list is not empty
         self.assertGreater(len(parameters), 0, "EmptyOperator should have at least some parameters")
 
-    @patch("dag_converter.conversion.tasks.get_operator_parameters")
-    def test_params_filtered_when_matching_dag_params(self, mock_get_params):
+    def test_params_filtered_when_matching_dag_params(self):
         """Test that task params are filtered when they match DAG params"""
-        mock_get_params.return_value = ["params", "task_id"]
         mock_validator = Mock()
         mock_validator.validate_field.return_value = True
         mock_taskflow_parser = Mock()
@@ -245,10 +226,8 @@ class TestGetOperatorParameters(unittest.TestCase):
         # params should be filtered out since they match DAG params
         self.assertNotIn("params", result["test_task"])
 
-    @patch("dag_converter.conversion.tasks.get_operator_parameters")
-    def test_params_kept_when_different_from_dag_params(self, mock_get_params):
+    def test_params_kept_when_different_from_dag_params(self):
         """Test that task params are kept when they differ from DAG params"""
-        mock_get_params.return_value = ["params", "task_id"]
         mock_validator = Mock()
         mock_validator.validate_field.return_value = True
         mock_taskflow_parser = Mock()
@@ -276,10 +255,8 @@ class TestGetOperatorParameters(unittest.TestCase):
         self.assertIn("params", result["test_task"])
         self.assertEqual(result["test_task"]["params"], {"s3_bucket": "different-bucket", "custom_param": "value"})
 
-    @patch("dag_converter.conversion.tasks.get_operator_parameters")
-    def test_empty_params_filtered_when_dag_params_empty(self, mock_get_params):
+    def test_empty_params_filtered_when_dag_params_empty(self):
         """Test that empty task params are filtered when DAG params are also empty"""
-        mock_get_params.return_value = ["params", "task_id"]
         mock_validator = Mock()
         mock_validator.validate_field.return_value = True
         mock_taskflow_parser = Mock()
@@ -306,10 +283,8 @@ class TestGetOperatorParameters(unittest.TestCase):
         # empty params should be filtered out
         self.assertNotIn("params", result["test_task"])
 
-    @patch("dag_converter.conversion.tasks.get_operator_parameters")
-    def test_identical_params_filtered_even_when_in_init_kwargs(self, mock_get_params):
+    def test_identical_params_filtered_even_when_in_init_kwargs(self):
         """Test that task params are filtered when they match DAG params even if in init_kwargs"""
-        mock_get_params.return_value = ["params", "task_id"]
         mock_validator = Mock()
         mock_validator.validate_field.return_value = True
         mock_taskflow_parser = Mock()
@@ -336,10 +311,8 @@ class TestGetOperatorParameters(unittest.TestCase):
         # params should be filtered since they match DAG params (not explicitly different)
         self.assertNotIn("params", result["test_task"])
 
-    @patch("dag_converter.conversion.tasks.get_operator_parameters")
-    def test_params_kept_when_same_key_different_value(self, mock_get_params):
+    def test_params_kept_when_same_key_different_value(self):
         """Test that task params are kept when they have same key but different value from DAG params"""
-        mock_get_params.return_value = ["params", "task_id"]
         mock_validator = Mock()
         mock_validator.validate_field.return_value = True
         mock_taskflow_parser = Mock()
