@@ -147,14 +147,29 @@ class CustomOperatorTestCase(unittest.TestCase):
             sys.path.remove(str(self.work_dir))
 
     def _write_dag(self, body: str) -> Path:
-        dag_file = self.work_dir / f"{self.dag_id}_file.py"
         header = DAG_HEADER.format(ops=self.ops, dag_id=self.dag_id)
-        dag_file.write_text(header + textwrap.indent(textwrap.dedent(body), "    "))
+        return self._write_source(header + textwrap.indent(textwrap.dedent(body), "    "))
+
+    def _write_source(self, source: str) -> Path:
+        dag_file = self.work_dir / f"{self.dag_id}_file.py"
+        dag_file.write_text(source)
         return dag_file
 
     def convert(self, body: str):
-        """Convert the Dag and return (original Dag, Dag loaded from the YAML by DagFactory, YAML tasks)"""
-        dag_file = self._write_dag(body)
+        """Convert a Dag with the given task definitions, see convert_source"""
+        return self._convert_file(self._write_dag(body))
+
+    def convert_source(self, source: str):
+        """
+        Convert a Dag file. '{ops}' and '{dag_id}' in 'source' are replaced with the test's module and Dag id.
+
+        Returns (original Dag, Dag loaded from the YAML by DagFactory, YAML of the Dag)
+        """
+        source = textwrap.dedent(source).replace("{ops}", self.ops).replace("{dag_id}", self.dag_id)
+        dag_file = self._write_source(source)
+        return self._convert_file(dag_file, whole_dag=True)
+
+    def _convert_file(self, dag_file: Path, whole_dag: bool = False):
         ConversionManager(s3_bucket=None).start_conversion_process(
             dag_file_path=dag_file, output_dir=self.output_dir, user_validate=True
         )
@@ -170,7 +185,8 @@ class CustomOperatorTestCase(unittest.TestCase):
         dagbag = DagBag(dag_folder=loader_dir, include_examples=False)
         self.assertEqual(dagbag.import_errors, {})
         converted = dagbag.dags[self.dag_id]
-        return original, converted, yaml.safe_load(yaml_path.read_text())[self.dag_id]["tasks"]
+        converted_yaml = yaml.safe_load(yaml_path.read_text())[self.dag_id]
+        return original, converted, converted_yaml if whole_dag else converted_yaml["tasks"]
 
 
 class TestTaskArguments(CustomOperatorTestCase):
@@ -258,9 +274,7 @@ class TestDynamicTaskMapping(CustomOperatorTestCase):
         self.assertEqual(tasks["lit"]["partial"], {"y": 100, "tag": "L"})
         self.assertEqual(converted.get_task("lit").partial_kwargs["y"], 100)
         self.assertEqual(converted.get_task("lit").partial_kwargs["tag"], "L")
-        self.assertEqual(
-            converted.get_task("lit").expand_input.value, original.get_task("lit").expand_input.value
-        )
+        self.assertEqual(converted.get_task("lit").expand_input.value, original.get_task("lit").expand_input.value)
 
     def test_expand_kwargs_is_rejected(self):
         """R8: DagFactory only supports a dict in 'expand'"""
@@ -324,9 +338,10 @@ class TestArgumentValues(CustomOperatorTestCase):
 
 class TestUnverifiedOperatorWarnings(CustomOperatorTestCase):
     def test_module_attribute_and_unusual_class_names(self):
-        with patch("dag_converter.conversion.tasks.print_warning") as task_warning, patch(
-            "dag_converter.static_validator.print_warning"
-        ) as static_warning:
+        with (
+            patch("dag_converter.conversion.tasks.print_warning") as task_warning,
+            patch("dag_converter.static_validator.print_warning") as static_warning,
+        ):
             self.convert('m.AddOperator(task_id="attr", x=1)\nGreeter(task_id="greet")\n')
 
         warnings = " ".join(str(c) for c in task_warning.call_args_list + static_warning.call_args_list)

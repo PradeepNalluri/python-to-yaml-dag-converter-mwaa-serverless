@@ -82,9 +82,7 @@ class TestUnverifiedOperatorConversion(unittest.TestCase):
     def test_inherited_default_args_are_not_repeated_on_tasks(self):
         """default_args not listed in the task schema stay in the Dag default_args unless overridden"""
         default_args = {"owner": "data-team", "email_on_failure": False}
-        with DAG(
-            dag_id="test_dag", start_date=datetime(2026, 1, 1), schedule=None, default_args=default_args
-        ) as dag:
+        with DAG(dag_id="test_dag", start_date=datetime(2026, 1, 1), schedule=None, default_args=default_args) as dag:
             SQLExecuteQueryOperator(task_id="inherits", conn_id="my_db", sql="SELECT 1")
             SQLExecuteQueryOperator(task_id="overrides", conn_id="my_db", sql="SELECT 1", owner="other-team")
 
@@ -103,6 +101,7 @@ class TestUnverifiedOperatorConversion(unittest.TestCase):
         tasks = self._convert(dag)
 
         self.assertEqual(tasks["run_sql"]["trigger_rule"], "always")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -43,6 +43,7 @@ Review the converted Dags in the `output_yaml` folder in the current directory
 * Dynamic task mapping conversion is not supported
 * Operators and argument classes must be importable where the YAML Dag runs. Classes defined in the Dag file are rejected
 * `expand_kwargs`, `functools.partial` values, more than one callback per callback argument, and objects other than enums, dataclasses and datetime values are rejected
+* Dag arguments `dag-factory` does not pass to the Dag are rejected when set: `user_defined_macros`, `user_defined_filters`, `fail_fast`, `fail_stop`, `max_consecutive_failed_dag_runs`, `owner_links`, `jinja_environment_kwargs`, `template_undefined`
 * PythonOperator, BranchPythonOperator and PythonSensor subclasses that set `python_callable` themselves are rejected, because `dag-factory` requires `python_callable` in the YAML
 
 ## Examples

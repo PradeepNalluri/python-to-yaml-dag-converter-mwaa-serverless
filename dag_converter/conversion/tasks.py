@@ -13,8 +13,9 @@ from airflow.utils.types import ArgNotSet
 
 from dag_converter.cleanup import is_dag_file_module
 from dag_converter.console_config import print_warning
+from dag_converter.conversion.arguments import get_task_argument_value
 from dag_converter.conversion.dynamic_mapping import handle_dynamic_task_mapping
-from dag_converter.conversion.exceptions import InvalidOperatorError, InvalidOperatorParameter
+from dag_converter.conversion.exceptions import InvalidOperatorError
 from dag_converter.dagbag import USER_KWARGS_ATTRIBUTE, get_assigned_attributes
 from dag_converter.schema_parser import ArgumentValidator
 from dag_converter.taskflow_parser import TaskFlowAnalyzer
@@ -164,18 +165,6 @@ def convert_tasks(
                 del tasks[task_id]["failure_states"]
 
     return tasks
-
-
-def get_task_argument_value(task_id: str, key: str, value: Any) -> Any:
-    """Check a task argument DagFactory cannot represent, returning the value to write"""
-    # DagFactory accepts a single callback per callback argument
-    if key.endswith("_callback") and isinstance(value, list | tuple):
-        if len(value) > 1:
-            raise InvalidOperatorParameter(
-                f"Task '{task_id}' passes {len(value)} callables to '{key}'. DagFactory supports a single callback"
-            )
-        return value[0] if value else None
-    return value
 
 
 def warn_if_unverified_operator(task_type: str, full_operator_name: str, validator: ArgumentValidator):

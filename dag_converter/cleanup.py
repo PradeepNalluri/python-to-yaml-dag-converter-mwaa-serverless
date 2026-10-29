@@ -3,12 +3,15 @@
 import dataclasses
 import functools
 import re
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, tzinfo
+from decimal import Decimal
 from enum import Enum
+from pathlib import PurePath
 from typing import Any
 
 from airflow.sdk.definitions.param import ParamsDict
 from airflow.sdk.definitions.xcom_arg import PlainXComArg
+from pendulum.tz.timezone import FixedTimezone
 
 from dag_converter.conversion.exceptions import InvalidOperatorParameter
 
@@ -93,8 +96,15 @@ def get_cleanup_dag(obj: Any) -> Any:
         # Regular dictionary
         return {k: get_cleanup_dag(v) for k, v in obj.items()}
 
-    if isinstance(obj, list | tuple | set):
+    if isinstance(obj, list):
         return [get_cleanup_dag(item) for item in obj]
+
+    # Other containers keep their type through DagFactory's '__type__', e.g. tuple([1, 2])
+    if isinstance(obj, tuple | set | frozenset):
+        items = [get_cleanup_dag(item) for item in obj]
+        if isinstance(obj, set | frozenset):
+            items = sorted(items, key=repr)
+        return {"__type__": f"builtins.{type(obj).__name__}", "__args__": [items]}
 
     if isinstance(obj, datetime):
         custom_object = {
@@ -107,13 +117,25 @@ def get_cleanup_dag(obj: Any) -> Any:
             "second": obj.second,
             "microsecond": obj.microsecond,
         }
-        return {key: value for key, value in custom_object.items() if value}
+        custom_object = {key: value for key, value in custom_object.items() if value}
+        if obj.tzinfo is not None:
+            custom_object["tzinfo"] = get_timezone_value(obj.tzinfo, obj)
+        return custom_object
 
     if isinstance(obj, date):
-        return obj.isoformat()
+        return {"__type__": "datetime.date", "__args__": [obj.year, obj.month, obj.day]}
 
     if isinstance(obj, time):
-        return obj.strftime("%H:%M:%S")
+        custom_object = {"__type__": "datetime.time", "__args__": [obj.hour, obj.minute, obj.second, obj.microsecond]}
+        if obj.tzinfo is not None:
+            custom_object["tzinfo"] = get_timezone_value(obj.tzinfo, None)
+        return custom_object
+
+    if isinstance(obj, Decimal):
+        return {"__type__": "decimal.Decimal", "__args__": [str(obj)]}
+
+    if isinstance(obj, PurePath):
+        return {"__type__": get_type_path(obj), "__args__": [str(obj)]}
 
     if isinstance(obj, timedelta):
         return {"__type__": "datetime.timedelta", "seconds": obj.total_seconds()}
@@ -155,6 +177,24 @@ def get_cleanup_dag(obj: Any) -> Any:
         )
 
     return str(obj)
+
+
+def get_timezone_name(tz: tzinfo, dt: datetime | None) -> str | int:
+    """IANA name of the timezone, or its UTC offset in seconds for fixed offsets. pendulum.timezone accepts both"""
+    name = getattr(tz, "key", None)  # zoneinfo
+    if name is None and not isinstance(tz, FixedTimezone):
+        name = getattr(tz, "name", None)  # pendulum
+    if name:
+        return name
+    offset = tz.utcoffset(dt)
+    if offset is None:
+        raise InvalidOperatorParameter(f"Timezone {tz!r} cannot be converted")
+    return "UTC" if not offset else int(offset.total_seconds())
+
+
+def get_timezone_value(tz: tzinfo, dt: datetime | None) -> dict[str, Any]:
+    """DagFactory '__type__' object that recreates the timezone"""
+    return {"__type__": "pendulum.timezone", "__args__": [get_timezone_name(tz, dt)]}
 
 
 def is_primitive(obj: Any) -> bool:
