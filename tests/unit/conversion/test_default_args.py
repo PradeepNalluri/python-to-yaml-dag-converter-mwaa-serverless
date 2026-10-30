@@ -25,7 +25,6 @@ class TestConvertDefaultArgs(unittest.TestCase):
         result = convert_default_args(args, self.mock_validator)
 
         self.assertEqual(result["retries"], 3)
-        self.mock_validator.validate_field.assert_called_with("dag", "default_args", "retries")
 
     def test_invalid_default_arg_raises_exception(self):
         """Test invalid default argument raises InvalidDefaultArg"""

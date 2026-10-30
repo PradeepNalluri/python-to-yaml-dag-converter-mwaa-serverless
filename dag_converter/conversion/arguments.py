@@ -1,8 +1,22 @@
-"""Checks for task arguments that DagFactory cannot represent."""
+"""Checks for Dag and task arguments that DagFactory cannot represent."""
 
 from typing import Any
 
-from dag_converter.conversion.exceptions import InvalidOperatorParameter
+from dag_converter.conversion.exceptions import InvalidDagParameter, InvalidOperatorParameter
+
+# Dag arguments DagFactory 1.0 does not pass to the Dag, so they would be dropped
+DAG_ARGUMENTS_IGNORED_BY_DAGFACTORY = {
+    "auto_register",
+    "disable_bundle_versioning",
+    "fail_fast",
+    "fail_stop",
+    "jinja_environment_kwargs",
+    "max_consecutive_failed_dag_runs",
+    "owner_links",
+    "template_undefined",
+    "user_defined_filters",
+    "user_defined_macros",
+}
 
 # Constructor arguments that describe the Dag structure rather than the task. Dag context managers inject
 # these into every operator, and DagFactory rebuilds them from the YAML
@@ -67,3 +81,15 @@ def get_task_argument_value(task_id: str, key: str, value: Any) -> Any:
     check_callables(f"Task '{task_id}'", key, value, InvalidOperatorParameter)
     return get_single_callback(f"Task '{task_id}'", key, value, InvalidOperatorParameter)
 
+
+def get_dag_argument_value(key: str, value: Any) -> Any:
+    """
+    Check a Dag argument or default argument, returning the value to write.
+    Returns None for empty arguments DagFactory ignores.
+    """
+    if key in DAG_ARGUMENTS_IGNORED_BY_DAGFACTORY:
+        if value is None or (isinstance(value, dict | list | tuple | set) and not value):
+            return None
+        raise InvalidDagParameter(f"Dag argument '{key}' is not supported by DagFactory, which would drop it")
+    check_callables("Dag", key, value, InvalidDagParameter)
+    return get_single_callback("Dag", key, value, InvalidDagParameter)

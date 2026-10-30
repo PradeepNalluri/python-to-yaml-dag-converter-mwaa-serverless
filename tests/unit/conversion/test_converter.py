@@ -117,10 +117,10 @@ class TestGetConvertedFormat(unittest.TestCase):
     def test_non_default_values_included(
         self, mock_get_defaults, mock_convert_default, mock_convert_schedule, mock_convert_tasks
     ):
-        """Test that non-default values like fail_fast=True are included in output"""
+        """Test that non-default values like catchup=True are included in output"""
         
         # Setup mocks
-        mock_get_defaults.return_value = {'fail_fast': False, 'max_active_runs': 16}
+        mock_get_defaults.return_value = {'catchup': False, 'max_active_runs': 16}
         mock_convert_default.return_value = {}
         mock_convert_schedule.return_value = "@daily"
         mock_convert_tasks.return_value = {}
@@ -130,19 +130,19 @@ class TestGetConvertedFormat(unittest.TestCase):
         dag_object = Mock()
         dag_object.dag_id = "test_dag"
         dag_object.params = {}
-        dag_object.fail_fast = True  # Non-default (default is False)
+        dag_object.catchup = True  # Non-default (default is False)
         dag_object.max_active_runs = 8  # Non-default (default is 16)
         del dag_object._dag_id
 
-        with patch("builtins.dir", return_value=["dag_id", "params", "fail_fast", "max_active_runs"]):
+        with patch("builtins.dir", return_value=["dag_id", "params", "catchup", "max_active_runs"]):
             result = get_converted_format(self.mock_taskflow_parser, dag_object, "test.py", self.mock_validator)
 
         dag_data = result["test_dag"]
         
         # Non-default values should be included
-        self.assertIn('fail_fast', dag_data)
+        self.assertIn('catchup', dag_data)
         self.assertIn('max_active_runs', dag_data)
-        self.assertEqual(dag_data['fail_fast'], True)
+        self.assertEqual(dag_data['catchup'], True)
         self.assertEqual(dag_data['max_active_runs'], 8)
 
 
