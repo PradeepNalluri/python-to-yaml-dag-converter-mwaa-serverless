@@ -2,15 +2,36 @@ import re
 from typing import Any
 
 from airflow.models.mappedoperator import MappedOperator
+from airflow.sdk.definitions._internal.expandinput import ListOfDictsExpandInput
+from airflow.utils.types import ArgNotSet
 
 from dag_converter.cleanup import get_cleanup_dag
-from dag_converter.schema_parser import ArgumentValidator
+from dag_converter.conversion.arguments import STRUCTURAL_TASK_PARAMETERS, unwrap_callbacks
+from dag_converter.conversion.exceptions import InvalidOperatorError
 
 
 def handle_dynamic_task_mapping(
-    tasks_dict: dict[str, Any], task_types: dict[str, str], task: MappedOperator, validator: ArgumentValidator
+    tasks_dict: dict[str, Any],
+    task_types: dict[str, str],
+    task: MappedOperator,
+    operator_defaults: dict[str, Any],
+    dag_default_args: dict[str, Any],
 ):
-    """Handle dynamic task mapping"""
+    """
+    Handle dynamic task mapping
+
+    Args:
+        tasks_dict: Converted task
+        task_types: Task id to operator type of every task in the Dag
+        task: Mapped task
+        operator_defaults: Constructor defaults of the mapped operator class
+        dag_default_args: Dag default_args, which Airflow merges into 'partial_kwargs'
+    """
+    if isinstance(getattr(task, "expand_input", None), ListOfDictsExpandInput):
+        raise InvalidOperatorError(
+            f"Task '{task.task_id}' uses expand_kwargs, which DagFactory does not support. Use expand instead"
+        )
+
     if hasattr(task, "op_kwargs_expand_input"):
         tasks_dict["expand"] = get_cleanup_dag(task.op_kwargs_expand_input.value)
         reformat(tasks_dict["expand"], task_types)
@@ -23,22 +44,45 @@ def handle_dynamic_task_mapping(
             reformat(tasks_dict["expand"]["op_kwargs"], task_types)
 
     if hasattr(task, "partial_kwargs"):
-        tasks_dict["partial"] = get_cleanup_dag(task.partial_kwargs)
+        # Airflow fills 'partial_kwargs' with the BaseOperator defaults and the Dag default_args.
+        # Keep only the values that differ from those, i.e. the arguments the user passed to partial()
+        # The converted task gets the Dag default_args value, or the constructor default, for missing values.
+        # TaskGroup default_args differ from those, so they are kept
+        partial = {
+            key: value
+            for key, value in task.partial_kwargs.items()
+            if key not in STRUCTURAL_TASK_PARAMETERS
+            and key not in tasks_dict
+            and not is_default_value(
+                unwrap_callbacks(key, value),
+                unwrap_callbacks(key, dag_default_args.get(key, operator_defaults.get(key))),
+            )
+        }
+        tasks_dict["partial"] = get_cleanup_dag(partial)
+
+        # DagFactory imports callbacks of the task itself, not in 'partial'
+        for key in [key for key in tasks_dict["partial"] if key.endswith("_callback")]:
+            tasks_dict[key] = tasks_dict["partial"].pop(key)
 
         # Handle Python Operator that uses DTM
         # The 'python_callable' will be set to be a string representation of the actual function
         # TODO: need better way to create the python_callable
         if "python_callable" in tasks_dict["partial"]:
-            tasks_dict["python_callable"] = tasks_dict["partial"]["python_callable"]
-            del tasks_dict["partial"]["python_callable"]
+            tasks_dict["python_callable"] = tasks_dict["partial"].pop("python_callable")
+        if not tasks_dict["partial"]:
+            del tasks_dict["partial"]
 
-        # Cleanup extra fields
-        keys_to_delete = []
-        for key, value in tasks_dict["partial"].items():
-            if not validator.validate_field("task", key, value) or value is None or key in tasks_dict:
-                keys_to_delete.append(key)
-        for key in keys_to_delete:
-            del tasks_dict["partial"][key]
+
+def is_default_value(value: Any, default: Any) -> bool:
+    """Check if 'value' is the effective default. Airflow stores some None defaults as empty containers"""
+    if isinstance(value, ArgNotSet) or (value is None and default is None):
+        return True
+    if default is None and isinstance(value, list | tuple | dict | set) and not value:
+        return True
+    try:
+        return bool(value == default)
+    except Exception:
+        return False
 
 
 def reformat(expand_dict: dict | list | tuple, task_types: dict[str, str]):

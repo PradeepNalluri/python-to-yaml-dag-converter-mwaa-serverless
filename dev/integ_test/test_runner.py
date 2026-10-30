@@ -7,7 +7,7 @@ from pathlib import Path
 src_path = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(src_path))
 
-from dag_converter.conversion.exceptions import InvalidOperatorError  # noqa: E402
+from dag_converter.conversion.exceptions import InvalidOperatorError, InvalidOperatorParameter  # noqa: E402
 from dag_converter.conversion_manager import ConversionManager  # noqa: E402
 
 
@@ -69,7 +69,7 @@ def run_tests(input_path, output_folder):
             )
             passed.append(py_file.name)
             print(f"✅ {py_file.name} - PASSED")
-        except InvalidOperatorError as e:
+        except (InvalidOperatorError, InvalidOperatorParameter) as e:
             unsupported.append((py_file.name, str(e)))
             print(f"🟨 {py_file.name} - UNSUPPORTED")
         except Exception as e:

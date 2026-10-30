@@ -8,6 +8,14 @@ from typing import Any
 from airflow.sdk.definitions.param import ParamsDict
 from airflow.sdk.definitions.xcom_arg import PlainXComArg
 
+# DagBag imports Dag files under internal module names that start with this prefix
+DAG_FILE_MODULE_PREFIX = "unusual_prefix_"
+
+
+def is_dag_file_module(module_name: str) -> bool:
+    """Check if 'module_name' is DagBag's internal name for the Dag file, which cannot be imported elsewhere"""
+    return module_name.startswith(DAG_FILE_MODULE_PREFIX)
+
 
 def get_cleanup_dag(obj: Any) -> Any:
     """Recursively clean data structure of non-serializable objects.

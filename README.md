@@ -38,9 +38,12 @@ Review the converted Dags in the `output_yaml` folder in the current directory
 * `--debug/--no-debug` Enable logging DagBag objects to .initial_task_attributes before and after conversion
 
 ## Limitations
-* Only AWS operators and AWS provider packages are supported
+* Operators outside the verified list in `validator_schema.yaml` are converted with a warning. Their provider packages must be installed where the converter runs
 * Behavior that is not supported in `dag-factory` will not be converted
-* Dynamic task mapping conversion is not supported
+* Dynamic task mapping with `expand_kwargs` is not supported
+* Operators must be importable where the YAML Dag runs. Operators defined in the Dag file are rejected
+* Attributes assigned after creating an operator are converted when they are arguments of the operator that `__init__` stores as passed. Other assignments are rejected, or ignored with a warning when the operator does not define the attribute
+* PythonOperator, BranchPythonOperator and PythonSensor subclasses that set `python_callable` themselves are rejected, because `dag-factory` requires `python_callable` in the YAML
 
 ## Examples
 * See supported [examples](https://github.com/awslabs/python-to-yaml-dag-converter-mwaa-serverless/blob/main/dev/integ_test/python_test_folder/supported)

@@ -118,9 +118,9 @@ def compare_task_attributes(task_initial: Any, task_final: Any, task_id: str) ->
     """Compare attributes of two tasks"""
     differences = []
 
-    # Get all attributes from both tasks
-    attrs_initial = set(vars(task_initial).keys())
-    attrs_final = set(vars(task_final).keys())
+    # Get all attributes from both tasks, without the converter's own bookkeeping (see dagbag.py)
+    attrs_initial = {key for key in vars(task_initial) if not key.startswith("_dag_converter_")}
+    attrs_final = {key for key in vars(task_final) if not key.startswith("_dag_converter_")}
 
     # Check for missing attributes
     missing_in_final = attrs_initial - attrs_final
