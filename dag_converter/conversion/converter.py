@@ -88,6 +88,9 @@ def get_converted_format(
             # Skip keywords that were not set by user (None values or default values)
             if value is None or is_dag_default_value(key, value, dag_defaults):
                 pass
+            # Airflow stores tags as a set, DagFactory appends to a list
+            elif key == "tags":
+                converted_dag[dag_id][key] = sorted(value)
             else:
                 converted_dag[dag_id][key] = value
 

@@ -41,7 +41,9 @@ Review the converted Dags in the `output_yaml` folder in the current directory
 * Operators outside the verified list in `validator_schema.yaml` are converted with a warning. Their provider packages must be installed where the converter runs
 * Behavior that is not supported in `dag-factory` will not be converted
 * Dynamic task mapping with `expand_kwargs` is not supported
-* Operators must be importable where the YAML Dag runs. Operators defined in the Dag file are rejected
+* Operators and argument classes must be importable where the YAML Dag runs. Classes defined in the Dag file are rejected
+* Callables are supported in `python_callable`, `execution_date_fn` and `on_*_callback` arguments, which `dag-factory` imports. They must be module-level functions: lambdas, nested functions, methods and `functools.partial` values are rejected, and so is more than one callback per callback argument. Callables in other arguments (e.g. `S3KeySensor.check_fn`) are rejected
+* Values must be primitives, containers, enums, dataclasses, named tuples, datetime values, `Decimal` or paths. Other objects (including pendulum `Interval`) are rejected, and so are dict keys other than str, int, float and bool
 * Attributes assigned after creating an operator are converted when they are arguments of the operator that `__init__` stores as passed. Other assignments are rejected, or ignored with a warning when the operator does not define the attribute
 * PythonOperator, BranchPythonOperator and PythonSensor subclasses that set `python_callable` themselves are rejected, because `dag-factory` requires `python_callable` in the YAML
 

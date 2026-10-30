@@ -1,7 +1,8 @@
-from types import NoneType
 from typing import Any
 
 import yaml
+
+from dag_converter.cleanup import TypedValue
 
 
 def build_yaml(cleaned_data: dict[str, Any]) -> str:
@@ -22,13 +23,9 @@ def build_yaml(cleaned_data: dict[str, Any]) -> str:
         """Handle dictionary presentation in YAML."""
         return dumper.represent_dict(data)
 
-    def represent_none(dumper, data: None):
-        """Handle NoneType. Use None instead of null"""
-        return dumper.represent_scalar("tag:yaml.org,2002:str", "None")
-
     CustomDumper.add_representer(str, str_presenter)
     CustomDumper.add_representer(dict, dict_presenter)
-    CustomDumper.add_representer(NoneType, represent_none)
+    CustomDumper.add_representer(TypedValue, dict_presenter)
 
     try:
         return yaml.dump(cleaned_data, Dumper=CustomDumper, default_flow_style=False, sort_keys=False)

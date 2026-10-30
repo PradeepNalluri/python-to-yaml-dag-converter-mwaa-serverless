@@ -114,7 +114,7 @@ def convert_tasks(
 
         # Only the arguments the user passed are written. DagFactory runs the operator's __init__ again, so
         # values __init__ derived (attributes) or passed to its base class must not be written back.
-        # None values are dropped afterwards, see drop_none_values
+        # Explicit None is written, it overrides default_args
         for key, value in user_kwargs.items():
             if key in STRUCTURAL_TASK_PARAMETERS or isinstance(value, ArgNotSet):
                 continue
@@ -152,8 +152,6 @@ def convert_tasks(
             for key in [key for key in tasks[task_id] if key.endswith("_callback")]:
                 tasks[task_id][key] = get_task_argument_value(task_id, key, tasks[task_id][key])
 
-        drop_none_values(tasks[task_id])
-
         # Handle operator-specific parameters that we need to delete
         if "operators.appflow" in full_operator_name and "flow_update" in tasks[task_id]:
             del tasks[task_id]["flow_update"]
@@ -179,15 +177,6 @@ def convert_tasks(
                 del tasks[task_id]["failure_states"]
 
     return tasks
-
-
-def drop_none_values(task_dict: dict[str, Any]):
-    """None values are not written, since the YAML would contain the string "None" instead"""
-    for section in (task_dict, task_dict.get("partial", {})):
-        for key in [key for key, value in section.items() if value is None]:
-            del section[key]
-    if "partial" in task_dict and not task_dict["partial"]:
-        del task_dict["partial"]
 
 
 def get_inherited_arguments(task: Operator, user_kwargs: dict[str, Any], dag_default_args: dict[str, Any]):
