@@ -1,10 +1,10 @@
 """Parse-time environment for loading Python Dags locally.
 
 Sets up, for the duration of a conversion:
-* AIRFLOW_HOME (defaults to the folder containing the Dag folder)
+* AIRFLOW_HOME, unless set (the folder containing ``dags/``, otherwise the current directory)
 * a throwaway SQLite metadata database, unless one is configured
-* a secrets backend (``parse_secrets``) that resolves --conn/--var overrides, wraps the user's
-  backend and returns placeholder Connections for any conn_id that is not otherwise defined
+* a secrets backend (``parse_secrets``) that wraps the user's backend and returns placeholder
+  Connections and Variables for anything that is not otherwise defined
 * a throwaway Cosmos cache dir, and no ``__pycache__`` written into the project
 
 Environment variables are set before Airflow is imported (the CLI imports Airflow lazily),
@@ -21,7 +21,7 @@ import re
 import shutil
 import sys
 import tempfile
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterator
 from pathlib import Path
 
 from dag_converter.console_config import print_info, print_warning
@@ -48,48 +48,33 @@ PIP_PACKAGE_NAMES = {
 
 
 class _State:
-    """Overrides and bookkeeping shared with the secrets backend (same process)."""
+    """Bookkeeping shared with the secrets backend (same process)."""
 
-    conns: dict[str, str] = {}
-    variables: dict[str, str] = {}
     temp_db_url: str | None = None
     db_ready = False
     requested_conn_ids: set[str] = set()
     stubbed_conn_ids: set[str] = set()
-    dag_folder: Path | None = None
+    stubbed_var_keys: set[str] = set()
 
 
 state = _State
 
 
 def find_dag_root(input_path: Path) -> Path:
-    """The Dag folder root: ``--dag-folder`` if given, otherwise the nearest folder named ``dags`` among the
-    input's folder (a file's parent) and its two parents, otherwise the input's folder."""
-    if state.dag_folder:
-        return state.dag_folder
+    """The Dag folder root (``/usr/local/airflow/dags`` on the service): ``./dags`` if it contains the input,
+    otherwise the input's folder (a file's parent)."""
     path = Path(input_path).absolute()
-    start = path if path.is_dir() else path.parent
-    for candidate in (start, *start.parents[:2]):
-        if candidate.name == "dags":
+    cwd_dags = (Path.cwd() / "dags").resolve()
+    for candidate in (path, *path.parents):
+        if candidate.resolve() == cwd_dags:  # keep the input's form of the path (e.g. /tmp vs /private/tmp)
             return candidate
-    return start
+    return path if path.is_dir() else path.parent
 
 
 def default_airflow_home(input_path: Path) -> Path:
-    """Folder containing ``dags/`` if the input is inside a ``dags`` folder, otherwise the input's directory."""
+    """The folder containing the Dag folder if it is named ``dags``, otherwise the current directory."""
     root = find_dag_root(input_path)
-    return root.parent if root.name == "dags" else root
-
-
-def parse_assignments(values: Iterable[str], option: str) -> dict[str, str]:
-    """Parse repeated KEY=VALUE options."""
-    result = {}
-    for value in values or []:
-        key, sep, rest = value.partition("=")
-        if not sep or not key:
-            raise ValueError(f"Invalid {option} value '{value}', expected KEY=VALUE")
-        result[key] = rest
-    return result
+    return root.parent if root.name == "dags" else Path.cwd()
 
 
 def _airflow_cfg() -> configparser.ConfigParser:
@@ -112,21 +97,10 @@ def _db_configured_by_user(cfg: configparser.ConfigParser) -> bool:
 
 
 @contextlib.contextmanager
-def parse_environment(
-    input_path: Path,
-    airflow_home: Path | None = None,
-    conns: Iterable[str] = (),
-    variables: Iterable[str] = (),
-    dag_folder: Path | None = None,
-) -> Iterator[None]:
+def parse_environment(input_path: Path) -> Iterator[None]:
     """Set up the parse-time environment; restores environment variables and sys.path on exit."""
-    parsed_conns = parse_assignments(conns, "--conn")
-    parsed_vars = parse_assignments(variables, "--var")
-    state.dag_folder = Path(dag_folder).expanduser().absolute() if dag_folder else None
     new_env: dict[str, str] = {"PYTHONDONTWRITEBYTECODE": "1"}
-    if airflow_home is not None:
-        new_env["AIRFLOW_HOME"] = str(Path(airflow_home).expanduser().absolute())
-    elif not os.environ.get("AIRFLOW_HOME"):
+    if not os.environ.get("AIRFLOW_HOME"):
         new_env["AIRFLOW_HOME"] = str(default_airflow_home(input_path))
 
     old_env = {
@@ -164,9 +138,9 @@ def parse_environment(
     os.environ[SECRETS_BACKEND_ENV] = SECRETS_BACKEND_PATH
     os.environ[SECRETS_BACKEND_KWARGS_ENV] = "{}"
 
-    state.conns, state.variables = parsed_conns, parsed_vars
     state.requested_conn_ids = set()
     state.stubbed_conn_ids = set()
+    state.stubbed_var_keys = set()
 
     # Mirror the service, where the Dag folder root is on the import path
     dag_root = str(find_dag_root(input_path))
@@ -188,7 +162,6 @@ def parse_environment(
         sys.dont_write_bytecode = old_dont_write_bytecode
         state.temp_db_url = None
         state.db_ready = False
-        state.dag_folder = None
         if reconfigure:
             _configure_orm()
         shutil.rmtree(temp_dir, ignore_errors=True)
@@ -196,7 +169,15 @@ def parse_environment(
             print_warning(
                 "Placeholder Connections were used for " + ", ".join(sorted(state.stubbed_conn_ids)) + ". Values "
                 "derived from them at parse time (e.g. hostnames in templated strings) are placeholders in the "
-                "YAML; pass --conn ID=URI for real values."
+                "YAML. Set AIRFLOW_CONN_<ID> or use a secrets backend for real values."
+            )
+        if state.stubbed_var_keys:
+            keys = sorted(state.stubbed_var_keys)
+            print_warning(
+                "Placeholder Variables were used for " + ", ".join(keys) + ". If the Dag's structure or task "
+                "values depend on them, the YAML contains the placeholder. Read them with a Jinja template "
+                f"(e.g. '{{{{ var.value.{keys[0]} }}}}') in the Dag, or set AIRFLOW_VAR_<KEY> to the real value "
+                "before converting."
             )
 
 
@@ -256,9 +237,4 @@ def import_error_hints(import_errors: dict) -> str:
         if top == "cosmos":
             hint += " Note: the PyPI package 'cosmos' is unrelated to Astronomer Cosmos."
         hints.append(hint)
-    if re.search(r"Variable \S+ does not exist", text) or "SUPERVISOR_COMMS" in text:
-        hints.append(
-            "Hint: the Dag reads an Airflow Variable (or Connection) at parse time that is not defined. "
-            "Pass --var KEY=VALUE (or --conn ID=URI) to provide it for conversion."
-        )
     return "".join(f"\n{hint}" for hint in hints)

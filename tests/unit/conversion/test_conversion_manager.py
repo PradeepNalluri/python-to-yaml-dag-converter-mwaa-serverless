@@ -1,3 +1,4 @@
+import os
 import shutil
 import sys
 import tempfile
@@ -383,8 +384,11 @@ class TestConversionManagerPackage(unittest.TestCase):
         (self.root / "not_a_dag.py").write_text("VALUE = 1\n")
         self.output = Path(self.temp_dir.name) / "out"
         sys.path.insert(0, str(self.root))
+        self.old_cwd = os.getcwd()
+        os.chdir(self.temp_dir.name)  # the project root, so ./dags is the Dag folder
 
     def tearDown(self):
+        os.chdir(self.old_cwd)
         sys.path.remove(str(self.root))
         for name in [n for n in sys.modules if n.startswith("helpers_cm")]:
             del sys.modules[name]

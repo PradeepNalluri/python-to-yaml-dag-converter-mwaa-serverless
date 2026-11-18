@@ -36,20 +36,17 @@ Review the converted Dags in the `output_yaml` folder in the current directory
 * `--bucket`: TEXT S3 bucket to upload converted Dags to. Uses local AWS credentials
 * `--validate/--no-validate`: Validate the output YAML using DagFactory
 * `--debug/--no-debug` Enable logging DagBag objects to .initial_task_attributes before and after conversion
-* `--dag-folder`: PATH Dag folder root (the folder that becomes `/usr/local/airflow/dags` on the service). Defaults to the nearest folder named `dags` among the input's folder (the parent folder for a file) and its two parent folders, otherwise the input's folder
-* `--airflow-home`: PATH `AIRFLOW_HOME` used while parsing. Defaults to `$AIRFLOW_HOME` if set, otherwise the folder containing `dags/` (or the input's folder when the input is not inside a `dags` folder)
-* `--conn`: ID=URI Connection used while parsing (repeatable), e.g. `--conn 'my_db=postgres://user:pass@host:5432/db'`
-* `--var`: KEY=VALUE Airflow Variable used while parsing (repeatable)
 * `--requirements`: PATH requirements.txt of the Dags; parse inside a cached virtualenv that contains them (see below)
 * `--package/--no-package` Also build a code package `<output>/<dag_id>.zip` per Dag (see below)
 * `--include`: PATTERN / `--exclude`: PATTERN With `--package`: glob, relative to the Dag folder, of files to add / omit (repeatable)
 * `--prefix`: TEXT With `--package` and `--bucket`: S3 key prefix for uploads
 
 ## How Dags are parsed
+Run the converter from your Airflow project root, the folder containing `dags/` (e.g. after `aws s3 sync s3://<mwaa-bucket>/dags ./dags`). The Dag folder (the folder that becomes `/usr/local/airflow/dags` on the service) is `./dags` if it contains the input, otherwise the input folder (the parent folder for a file). `AIRFLOW_HOME` is kept if set, otherwise it is the folder containing the Dag folder when that is named `dags`, else the current directory.
+
 The converter imports your Dag files with Airflow 3.0.6, so top-level Dag code runs locally. To make that work without a full Airflow setup:
 * If no metadata database is configured (`AIRFLOW__DATABASE__SQL_ALCHEMY_CONN` or `airflow.cfg`), a throwaway SQLite database is created in a temporary directory and deleted afterwards. Nothing is written to `AIRFLOW_HOME`.
-* Connections that are not defined anywhere (`--conn`, your secrets backend, `AIRFLOW_CONN_*` or the metadata database) resolve to a placeholder Connection, with a warning. `--conn` takes precedence over everything else.
-* Variables are not faked: a Variable read at parse time must exist (in your secrets backend, `AIRFLOW_VAR_*` or the metadata database) or be passed with `--var`. A secrets backend configured with `AIRFLOW__SECRETS__BACKEND` or in `airflow.cfg` is still consulted.
+* Connections and Variables that are not defined anywhere (your secrets backend, `AIRFLOW_CONN_<ID>` / `AIRFLOW_VAR_<KEY>` environment variables or the metadata database) resolve to placeholders (the string `placeholder`), with a warning. This is fine when they are only used inside templates or at run time; if the Dag's structure or task values depend on them at parse time, the YAML contains the placeholder, so read them with a Jinja template (e.g. `{{ var.value.KEY }}`) or set the real value before converting. A secrets backend configured with `AIRFLOW__SECRETS__BACKEND` or in `airflow.cfg` is still consulted.
 * The Dag folder root is added to the import path, as on MWAA Serverless.
 * Cosmos uses a temporary cache directory (unless `[cosmos] cache_dir` is configured), and no `__pycache__` folders are written into your project.
 * The interpreter and converter version are printed at start. If a module is missing, the error names the pip package to install (e.g. `cosmos` is provided by `astronomer-cosmos`).

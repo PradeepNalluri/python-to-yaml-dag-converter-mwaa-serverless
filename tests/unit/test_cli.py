@@ -179,9 +179,10 @@ class TestCliNewOptions(unittest.TestCase):
 
     def test_help_lists_new_options(self):
         result = runner.invoke(app, ["convert", "--help"])
-        options = ["--dag-folder", "--airflow-home", "--conn", "--var", "--requirements", "--package"]
-        for option in [*options, "--include", "--exclude"]:
+        for option in ["--requirements", "--package", "--include", "--exclude"]:
             self.assertIn(option, result.output)
+        for option in ["--dag-folder", "--airflow-home", "--conn", "--var"]:
+            self.assertNotIn(option, result.output)
 
     @patch("dag_converter.conversion_manager.ConversionManager")
     def test_banner_shows_interpreter_and_version(self, mock_conversion_manager):
@@ -198,19 +199,12 @@ class TestCliNewOptions(unittest.TestCase):
     def test_package_options(self, mock_conversion_manager):
         from dag_converter.code_package import PackageOptions
 
-        args = ["--package", "--include", "sql/*", "--exclude", "tmp", "--prefix", "p", "--conn", "a=sqlite://"]
-        result = runner.invoke(app, ["convert", str(self.sample_dag_path), *args, "--var", "k=v"])
+        args = ["--package", "--include", "sql/*", "--exclude", "tmp", "--prefix", "p"]
+        result = runner.invoke(app, ["convert", str(self.sample_dag_path), *args])
         self.assertEqual(result.exit_code, 0, result.output)
         mock_conversion_manager.assert_called_once_with(
             s3_bucket="", package_options=PackageOptions(includes=["sql/*"], excludes=["tmp"], prefix="p")
         )
-
-    @patch("dag_converter.parse_env.parse_environment")
-    @patch("dag_converter.conversion_manager.ConversionManager")
-    def test_dag_folder_option(self, mock_conversion_manager, mock_parse_environment):
-        result = runner.invoke(app, ["convert", str(self.sample_dag_path), "--dag-folder", "tests"])
-        self.assertEqual(result.exit_code, 0, result.output)
-        self.assertEqual(mock_parse_environment.call_args.kwargs["dag_folder"], Path("tests"))
 
     @patch("dag_converter.requirements_env.run_in_requirements_env", return_value=0)
     @patch("dag_converter.conversion_manager.ConversionManager")

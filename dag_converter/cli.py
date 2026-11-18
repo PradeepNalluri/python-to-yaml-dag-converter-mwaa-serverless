@@ -26,16 +26,6 @@ def convert(
     debug: Annotated[
         bool, typer.Option(help="Enable logging DagBag objects to .initial_task_attributes before and after conversion")
     ] = False,  # noqa 501
-    dag_folder: Annotated[
-        Path | None, typer.Option(help="Dag folder root, as on the service [default: nearest dags/ folder, see README]")
-    ] = None,
-    airflow_home: Annotated[
-        Path | None, typer.Option(help="AIRFLOW_HOME for parsing [default: $AIRFLOW_HOME, else parent of dags/]")
-    ] = None,
-    conn: Annotated[
-        list[str] | None, typer.Option(help="Connection for parsing as ID=URI (repeatable); others get a placeholder")
-    ] = None,
-    var: Annotated[list[str] | None, typer.Option(help="Airflow Variable for parsing as KEY=VALUE, repeatable")] = None,
     requirements: Annotated[
         Path | None, typer.Option(help="requirements.txt of the Dags; parse inside a cached virtualenv with them")
     ] = None,
@@ -63,9 +53,7 @@ def convert(
 
     from dag_converter.parse_env import parse_environment
 
-    with parse_environment(
-        input_path, airflow_home=airflow_home, conns=conn or [], variables=var or [], dag_folder=dag_folder
-    ):
+    with parse_environment(input_path):
         # Imported here: Airflow reads its configuration on import, so the parse environment must be set first
         from dag_converter.conversion_manager import ConversionManager
 
