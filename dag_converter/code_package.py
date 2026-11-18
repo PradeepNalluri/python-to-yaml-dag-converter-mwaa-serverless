@@ -564,9 +564,12 @@ def build_zip(zip_path: Path, local_files: dict[str, Path], staged: dict[str, Pa
 
     total = sum(file.stat().st_size for file in entries.values())
     if total > runtime.MAX_CODE_SIZE_BYTES:
-        raise PackagingError(
-            f"Code package for {zip_path.name} is {_human(total)} uncompressed, which exceeds the "
-            f"MWAA Serverless limit of {_human(runtime.MAX_CODE_SIZE_BYTES)}."
+        largest = ", ".join(
+            f"{name} ({_human(size)})" for name, _, size in sorted(dist_summary, key=lambda d: -d[2])[:5]
+        )
+        print_warning(
+            f"Code package {zip_path.name} is {_human(total)} uncompressed, which exceeds the MWAA Serverless "
+            f"limit of {_human(runtime.MAX_CODE_SIZE_BYTES)}; the service will reject it. Largest packages: {largest}"
         )
 
     dist_infos = {runtime.normalize_name(a.split("/")[0].split("-")[0]) for a in entries if ".dist-info/" in a}

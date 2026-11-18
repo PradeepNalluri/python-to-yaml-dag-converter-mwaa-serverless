@@ -251,9 +251,15 @@ class TestZip(PackagingTestCase):
         names, _ = self.package({"d": {"a": str(self.root / "config.yaml"), "b": str(self.root / "shared")}})
         self.assertEqual(names, {"config.yaml", "shared/lib.py"})
 
-    def test_size_limit(self):
-        with patch.object(code_package.runtime, "MAX_CODE_SIZE_BYTES", 3), self.assertRaises(PackagingError):
-            build_zip(Path(self.temp_dir.name) / "x.zip", {"scripts/run.sh": self.root / "scripts" / "run.sh"}, {})
+    def test_size_limit_warns_but_writes_zip(self):
+        zip_path = Path(self.temp_dir.name) / "x.zip"
+        with (
+            patch.object(code_package.runtime, "MAX_CODE_SIZE_BYTES", 3),
+            patch.object(code_package, "print_warning") as warn,
+        ):
+            build_zip(zip_path, {"scripts/run.sh": self.root / "scripts" / "run.sh"}, {})
+        self.assertTrue(zip_path.exists())
+        self.assertIn("exceeds the MWAA Serverless limit", warn.call_args.args[0])
 
     def test_install_failure_names_package(self):
         failed = type("Result", (), {"returncode": 1, "stderr": "No matching distribution found", "stdout": ""})
