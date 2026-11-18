@@ -270,8 +270,6 @@ class TestConversionManager(unittest.TestCase):
         mock_upload,
     ):
         """With a code package, local paths are rewritten and both files are uploaded"""
-        from dag_converter.code_package import PackageOptions
-
         mock_dag = Mock()
         mock_dag.dag_id = "sample_dag"
         mock_dag.tasks = []
@@ -283,7 +281,7 @@ class TestConversionManager(unittest.TestCase):
         zip_path = self.temp_output_dir / "sample_dag.zip"
         mock_package.return_value = (zip_path, [])
 
-        manager = ConversionManager(s3_bucket="test-bucket", package_options=PackageOptions())
+        manager = ConversionManager(s3_bucket="test-bucket")
         manager.start_conversion_process(
             dag_file_path=self.sample_dag_file, output_dir=self.temp_output_dir, user_validate=False
         )

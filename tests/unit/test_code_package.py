@@ -11,7 +11,6 @@ from packaging.requirements import Requirement
 
 from dag_converter import code_package
 from dag_converter.code_package import (
-    PackageOptions,
     PackagingError,
     build_zip,
     find_local_paths,
@@ -179,13 +178,12 @@ class TestZip(PackagingTestCase):
         out = Path(self.temp_dir.name) / "output"
         out.mkdir()
         file_modules = static_imports({self.dag_file}, self.root)
-        options = PackageOptions(includes=["lazy_mod.py"])
         with (
             patch.object(code_package, "third_party_distributions", return_value={}) as dists,
             patch.object(code_package, "print_warning"),
         ):
             zip_path, sources = package_dag(
-                dag, "d", self.dag_file, self.root, file_modules, options, out, {self.dag_file}
+                dag, "d", self.dag_file, self.root, file_modules, ["lazy_mod.py"], out, {self.dag_file}
             )
         self.assertIn("yaml", dists.call_args[0][0])
         self.assertEqual(zip_path, out / "d.zip")
@@ -203,9 +201,7 @@ class TestZip(PackagingTestCase):
             patch.object(code_package, "print_warning") as warn,
             patch.object(code_package, "print_info"),
         ):
-            zip_path, _ = package_dag(
-                dag, "d", self.dag_file, self.root, (set(), set()), PackageOptions(includes=list(includes)), out, set()
-            )
+            zip_path, _ = package_dag(dag, "d", self.dag_file, self.root, (set(), set()), list(includes), out, set())
         return set(zipfile.ZipFile(zip_path).namelist()), " ".join(c.args[0] for c in warn.call_args_list)
 
     def test_no_package_when_nothing_to_bundle(self):
@@ -222,7 +218,7 @@ class TestZip(PackagingTestCase):
                 self.dag_file,
                 self.root,
                 (set(), set()),
-                PackageOptions(),
+                [],
                 out,
                 {self.dag_file},
             )

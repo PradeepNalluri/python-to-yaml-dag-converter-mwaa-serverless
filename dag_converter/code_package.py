@@ -31,7 +31,6 @@ import sys
 import tempfile
 import zipfile
 from collections.abc import Iterator
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -49,11 +48,6 @@ MODULE_REFERENCE_KEYS = {"python_callable", "operator", "__type__"}
 
 class PackagingError(Exception):
     pass
-
-
-@dataclass
-class PackageOptions:
-    includes: list[str] = field(default_factory=list)
 
 
 # Environment markers of the service, used to evaluate dependency markers
@@ -627,7 +621,7 @@ def package_dag(
     dag_file: Path,
     dag_root: Path,
     file_modules: tuple[set[Path], set[str]],
-    options: PackageOptions,
+    includes: list[str],
     output_dir: Path,
     dag_files: set[Path],
 ) -> tuple[Path | None, list[Path]]:
@@ -657,7 +651,7 @@ def package_dag(
         add(module, allow_dag_file=True)
     for path in yaml_paths:
         add(path, allow_dag_file=False)
-    for pattern in options.includes:
+    for pattern in includes:
         matched = list(Path(dag_root).glob(pattern))
         if not matched:
             print_warning(f"--include pattern '{pattern}' did not match anything under {dag_root}")

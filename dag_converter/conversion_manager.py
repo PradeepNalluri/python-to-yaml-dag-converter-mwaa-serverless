@@ -22,9 +22,9 @@ TEMPORARY_DAG_ID = "temp-id"
 
 
 class ConversionManager:
-    def __init__(self, s3_bucket: str | None, package_options: code_package.PackageOptions | None = None):
+    def __init__(self, s3_bucket: str | None, includes: list[str] | None = None):
         self.s3_bucket = s3_bucket
-        self.package_options = package_options or code_package.PackageOptions()
+        self.includes = includes or []
         self._dag_files: set[Path] = set()
         self._runtime_conn_ids: set[str] = set()
         self._runtime_var_keys: set[str] = set()
@@ -160,7 +160,7 @@ class ConversionManager:
                 dag_file_path,
                 dag_root,
                 file_modules,
-                self.package_options,
+                self.includes,
                 output_dir,
                 self._dag_files,
             )
