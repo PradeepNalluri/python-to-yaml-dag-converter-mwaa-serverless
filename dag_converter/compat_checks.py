@@ -49,11 +49,7 @@ def _literal_env_keys(tree: ast.AST) -> Iterable[tuple[str, int]]:
         elif isinstance(node, ast.Call) and node.args:
             func = node.func
             if (
-                (
-                    isinstance(func, ast.Attribute)
-                    and func.attr in ("get", "setdefault", "pop")
-                    and _is_environ(func.value)
-                )
+                (isinstance(func, ast.Attribute) and func.attr == "get" and _is_environ(func.value))
                 or (isinstance(func, ast.Attribute) and func.attr == "getenv")
                 or (isinstance(func, ast.Name) and func.id == "getenv")
             ):

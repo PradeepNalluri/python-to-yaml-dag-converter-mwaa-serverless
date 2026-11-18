@@ -29,7 +29,7 @@ class TestCompatChecks(unittest.TestCase):
             source.write_text(
                 "import os\nfrom os import getenv, environ\n"
                 "a = os.environ['AIRFLOW_HOME']\nb = os.getenv('MY-KEY')\nc = environ.get('OK_KEY')\n"
-                "d = getenv('AWS_REGION', 'x')\ne = os.environ.get(name)\n"
+                "d = getenv('AWS_REGION', 'x')\ne = os.environ.get(name)\nos.environ.setdefault('AWS_X', 'y')\n"
             )
             with patch.object(compat_checks, "print_warning") as warn:
                 compat_checks.check_env_var_usage([source])
