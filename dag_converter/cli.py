@@ -32,10 +32,6 @@ def convert(
     include: Annotated[
         list[str] | None, typer.Option(help="Glob relative to the Dag folder to add to the code zip (repeatable)")
     ] = None,
-    exclude: Annotated[
-        list[str] | None, typer.Option(help="Glob relative to the Dag folder to omit from the code zip (repeatable)")
-    ] = None,
-    prefix: Annotated[str, typer.Option(help="With --bucket: S3 key prefix for uploads")] = "",
 ):
     """
     Loads Python Dags from input and converts them to YAML Dags.
@@ -56,7 +52,7 @@ def convert(
         # Imported here: Airflow reads its configuration on import, so the parse environment must be set first
         from dag_converter.conversion_manager import ConversionManager
 
-        package_options = PackageOptions(includes=include or [], excludes=exclude or [], prefix=prefix)
+        package_options = PackageOptions(includes=include or [])
         conversion_manager = ConversionManager(s3_bucket=bucket, package_options=package_options)
         conversion_manager.start_conversion_process(
             dag_file_path=input_path, output_dir=output, user_validate=validate, debug=debug

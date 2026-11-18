@@ -37,8 +37,7 @@ Review the converted Dags in the `output_yaml` folder in the current directory
 * `--validate/--no-validate`: Validate the output YAML using DagFactory
 * `--debug/--no-debug` Enable logging DagBag objects to .initial_task_attributes before and after conversion
 * `--requirements`: PATH requirements.txt of the Dags; parse inside a cached virtualenv that contains them (see below)
-* `--include`: PATTERN / `--exclude`: PATTERN Glob, relative to the Dag folder, of files to add to / omit from the code package (repeatable; see below)
-* `--prefix`: TEXT With `--bucket`: S3 key prefix for uploads
+* `--include`: PATTERN Glob, relative to the Dag folder, of files to add to the code package (repeatable; see below)
 
 ## How Dags are parsed
 Run the converter from your Airflow project root, the folder containing `dags/` (e.g. after `aws s3 sync s3://<mwaa-bucket>/dags ./dags`). The Dag folder (the folder that becomes `/usr/local/airflow/dags` on the service) is `./dags` if it contains the input, otherwise the input folder (the parent folder for a file). `AIRFLOW_HOME` is kept if set, otherwise it is the folder containing the Dag folder when that is named `dags`, else the current directory.
@@ -73,7 +72,7 @@ It never contains the Dag files being converted (unless imported by an included 
 The converter also warns about things MWAA Serverless does not support: reserved or invalid environment variable names read by the Dag, connection ids that cannot be expressed as `AIRFLOW_CONN_*` variables (in the end-of-run notice), and deferrable tasks.
 
 ### `--bucket`
-The YAML is uploaded to `dags/<dag_id>.yaml` and, if there is one, the zip to `code/<dag_id>.zip` (both under `--prefix`, if given), and a ready-to-run `aws mwaa-serverless create-workflow` command is printed (with `--code` only when a zip was uploaded). Object versions are included when the bucket has versioning enabled. When the workflow needs connections or Variables, the command includes `--environment` with the Secrets Manager backend, in the region configured for boto3 (`<region>` if none):
+The YAML is uploaded to `dags/<dag_id>.yaml` and, if there is one, the zip to `code/<dag_id>.zip`, and a ready-to-run `aws mwaa-serverless create-workflow` command is printed (with `--code` only when a zip was uploaded). Object versions are included when the bucket has versioning enabled. When the workflow needs connections or Variables, the command includes `--environment` with the Secrets Manager backend, in the region configured for boto3 (`<region>` if none):
 ```
 --environment '{"Variables": {"AIRFLOW__WORKERS__SECRETS_BACKEND": "airflow.providers.amazon.aws.secrets.secrets_manager.SecretsManagerBackend", "AIRFLOW__WORKERS__SECRETS_BACKEND_KWARGS": "{\"connections_prefix\": \"airflow/connections\", \"variables_prefix\": \"airflow/variables\", \"region_name\": \"<region>\"}"}}'
 ```

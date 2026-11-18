@@ -54,8 +54,6 @@ class PackagingError(Exception):
 @dataclass
 class PackageOptions:
     includes: list[str] = field(default_factory=list)
-    excludes: list[str] = field(default_factory=list)
-    prefix: str = ""
 
 
 # Environment markers of the service, used to evaluate dependency markers
@@ -112,12 +110,6 @@ def _is_local_module_file(file: str | Path, dag_root: Path) -> bool:
     return not _in_venv(Path(path), dag_root)
 
 
-def _matches(rel: str, patterns: list[str]) -> bool:
-    parts = rel.split("/")
-    prefixes = ["/".join(parts[: i + 1]) for i in range(len(parts))]
-    return any(fnmatch.fnmatch(p, pattern) for p in prefixes for pattern in patterns)
-
-
 def _is_secret(rel: str) -> bool:
     return any(fnmatch.fnmatch(rel.rsplit("/", 1)[-1], p) for p in SECRET_FILE_PATTERNS)
 
@@ -127,7 +119,6 @@ def is_excluded(
     dag_root: Path,
     excluded_files: set[Path],
     output_dir: Path | None,
-    excludes: list[str],
 ) -> bool:
     rel = relative_to_root(path, dag_root)
     if not rel:
@@ -144,9 +135,7 @@ def is_excluded(
         out = Path(output_dir).resolve()
         if real == out or out in real.parents:
             return True
-    if _in_venv(path, dag_root):
-        return True
-    return _matches(rel, excludes)
+    return _in_venv(path, dag_root)
 
 
 def _walk(path: Path) -> Iterator[Path]:
@@ -557,7 +546,7 @@ def build_zip(zip_path: Path, local_files: dict[str, Path], staged: dict[str, Pa
     if total > runtime.MAX_CODE_SIZE_BYTES:
         raise PackagingError(
             f"Code package for {zip_path.name} is {_human(total)} uncompressed, which exceeds the "
-            f"MWAA Serverless limit of {_human(runtime.MAX_CODE_SIZE_BYTES)}. Use --exclude to trim it."
+            f"MWAA Serverless limit of {_human(runtime.MAX_CODE_SIZE_BYTES)}."
         )
 
     dist_infos = {runtime.normalize_name(a.split("/")[0].split("-")[0]) for a in entries if ".dist-info/" in a}
@@ -633,7 +622,7 @@ def package_dag(
     def add(path: Path, allow_dag_file: bool, explicit: bool = False) -> None:
         skip = set() if allow_dag_file else excluded_dag_files
         for file in _walk(path):
-            if is_excluded(file, dag_root, skip, output_dir, options.excludes):
+            if is_excluded(file, dag_root, skip, output_dir):
                 continue
             rel = relative_to_root(file, dag_root)
             if _is_secret(rel) and not explicit:

@@ -123,20 +123,14 @@ class TestDiscovery(PackagingTestCase):
 
 
 class TestExclusions(PackagingTestCase):
-    def excluded(self, rel, excludes=()):
-        return is_excluded(self.root / rel, self.root, {self.dag_file.resolve()}, self.root / "out", list(excludes))
+    def excluded(self, rel):
+        return is_excluded(self.root / rel, self.root, {self.dag_file.resolve()}, self.root / "out")
 
     def test_never_included(self):
         for rel in ["my_dag.py", "scripts/.DS_Store", "scripts/__pycache__/x.pyc", "venv/lib/site.py", "out/old.yaml"]:
             self.assertTrue(self.excluded(rel), rel)
         self.assertFalse(self.excluded("scripts/run.sh"))
 
-    def test_user_excludes(self):
-        self.assertTrue(self.excluded("scripts/run.sh", ["scripts"]))
-        self.assertTrue(self.excluded("scripts/run.sh", ["*.sh"]))
-
-
-class TestPaths(PackagingTestCase):
     def test_rewrite_paths(self):
         (self.root / "dbt" / "proj").mkdir(parents=True)
         data = {"a": str(self.root / "dbt" / "proj"), "b": ["/elsewhere/x", str(self.root / "missing.sql")], "c": 1}

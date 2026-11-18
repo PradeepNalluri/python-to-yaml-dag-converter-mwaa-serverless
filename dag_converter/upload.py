@@ -55,18 +55,16 @@ def create_workflow_command(dag_id: str, definition: dict, code: dict | None, en
 def upload_package(
     s3_client,
     bucket: str,
-    prefix: str,
     dag_id: str,
     yaml_path: Path,
     zip_path: Path | None,
     environment: dict | None = None,
 ) -> str:
-    """Upload to <prefix>dags/<dag_id>.yaml and, if there is a zip, <prefix>code/<dag_id>.zip; print and return
+    """Upload to dags/<dag_id>.yaml and, if there is a zip, code/<dag_id>.zip; print and return
     the create-workflow command (with ``environment``, if given)."""
-    prefix = f"{prefix.strip('/')}/" if prefix.strip("/") else ""
     try:
-        definition = _put(s3_client, bucket, f"{prefix}dags/{dag_id}.yaml", yaml_path)
-        code = _put(s3_client, bucket, f"{prefix}code/{dag_id}.zip", zip_path) if zip_path else None
+        definition = _put(s3_client, bucket, f"dags/{dag_id}.yaml", yaml_path)
+        code = _put(s3_client, bucket, f"code/{dag_id}.zip", zip_path) if zip_path else None
     except Exception as e:
         print_error(f"Failed to upload to S3: {e}")
         raise

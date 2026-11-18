@@ -29,13 +29,13 @@ class TestUpload(unittest.TestCase):
             patch.object(upload, "print_progress"),
             patch.object(upload, "print_success"),
         ):
-            command = upload.upload_package(s3, "bucket", "team/", "my_dag", self.yaml_path, self.zip_path)
+            command = upload.upload_package(s3, "bucket", "my_dag", self.yaml_path, self.zip_path)
         keys = [call.kwargs["Key"] for call in s3.put_object.call_args_list]
-        self.assertEqual(keys, ["team/dags/my_dag.yaml", "team/code/my_dag.zip"])
+        self.assertEqual(keys, ["dags/my_dag.yaml", "code/my_dag.zip"])
         self.assertIn("aws mwaa-serverless create-workflow", command)
-        self.assertIn('"ObjectKey": "team/dags/my_dag.yaml", "VersionId": "v-yaml"', command)
+        self.assertIn('"ObjectKey": "dags/my_dag.yaml", "VersionId": "v-yaml"', command)
         self.assertIn(
-            '{"S3Location": {"Bucket": "bucket", "ObjectKey": "team/code/my_dag.zip", "VersionId": "v-zip"}}', command
+            '{"S3Location": {"Bucket": "bucket", "ObjectKey": "code/my_dag.zip", "VersionId": "v-zip"}}', command
         )
         self.assertIn("--role-arn <EXECUTION_ROLE_ARN>", command)
 
@@ -47,7 +47,7 @@ class TestUpload(unittest.TestCase):
             patch.object(upload, "print_progress"),
             patch.object(upload, "print_success"),
         ):
-            command = upload.upload_package(s3, "bucket", "", "my_dag", self.yaml_path, self.zip_path)
+            command = upload.upload_package(s3, "bucket", "my_dag", self.yaml_path, self.zip_path)
         self.assertIn('"ObjectKey": "dags/my_dag.yaml"}', command)
         self.assertNotIn("VersionId", command)
 
@@ -59,9 +59,9 @@ class TestUpload(unittest.TestCase):
             patch.object(upload, "print_progress"),
             patch.object(upload, "print_success"),
         ):
-            command = upload.upload_package(s3, "bucket", "team", "my_dag", self.yaml_path, None)
-        self.assertEqual([call.kwargs["Key"] for call in s3.put_object.call_args_list], ["team/dags/my_dag.yaml"])
-        self.assertIn('"ObjectKey": "team/dags/my_dag.yaml", "VersionId": "v-yaml"', command)
+            command = upload.upload_package(s3, "bucket", "my_dag", self.yaml_path, None)
+        self.assertEqual([call.kwargs["Key"] for call in s3.put_object.call_args_list], ["dags/my_dag.yaml"])
+        self.assertIn('"ObjectKey": "dags/my_dag.yaml", "VersionId": "v-yaml"', command)
         self.assertNotIn("--code", command)
         self.assertIn("--role-arn <EXECUTION_ROLE_ARN>", command)
 

@@ -136,7 +136,7 @@ class TestRuntimeLookups(unittest.TestCase):
         ):
             ConversionManager(s3_bucket="bucket").start_conversion_process(self.dag_file, self.output)
         # --bucket: the create-workflow command gets the secrets backend environment
-        self.assertIn("AIRFLOW__WORKERS__SECRETS_BACKEND", upload.call_args.args[6]["Variables"])
+        self.assertIn("AIRFLOW__WORKERS__SECRETS_BACKEND", upload.call_args.args[5]["Variables"])
         text = (self.output / "runtime_dag.yaml").read_text()
         self.assertNotIn("__dagconv", text.lower())
         tasks = yaml.safe_load(text)["runtime_dag"]["tasks"]

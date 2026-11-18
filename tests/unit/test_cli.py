@@ -180,9 +180,11 @@ class TestCliNewOptions(unittest.TestCase):
 
     def test_help_lists_new_options(self):
         result = runner.invoke(app, ["convert", "--help"])
-        for option in ["--requirements", "--include", "--exclude", "--prefix"]:
+        for option in ["--requirements", "--include"]:
             self.assertIn(option, result.output)
-        for option in ["--dag-folder", "--airflow-home", "--conn", "--var", "--package", "--no-package"]:
+        removed = ["--dag-folder", "--airflow-home", "--conn", "--var", "--package", "--no-package"]
+        removed += ["--exclude", "--prefix"]
+        for option in removed:
             self.assertNotIn(option, result.output)
 
     @patch("dag_converter.conversion_manager.ConversionManager")
@@ -198,11 +200,11 @@ class TestCliNewOptions(unittest.TestCase):
 
     @patch("dag_converter.conversion_manager.ConversionManager")
     def test_package_options(self, mock_conversion_manager):
-        args = ["--include", "sql/*", "--exclude", "tmp", "--prefix", "p"]
+        args = ["--include", "sql/*"]
         result = runner.invoke(app, ["convert", str(self.sample_dag_path), *args])
         self.assertEqual(result.exit_code, 0, result.output)
         mock_conversion_manager.assert_called_once_with(
-            s3_bucket="", package_options=PackageOptions(includes=["sql/*"], excludes=["tmp"], prefix="p")
+            s3_bucket="", package_options=PackageOptions(includes=["sql/*"])
         )
 
     def test_package_flag_is_gone(self):

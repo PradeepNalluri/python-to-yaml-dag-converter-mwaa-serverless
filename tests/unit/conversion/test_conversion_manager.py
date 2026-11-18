@@ -283,7 +283,7 @@ class TestConversionManager(unittest.TestCase):
         zip_path = self.temp_output_dir / "sample_dag.zip"
         mock_package.return_value = (zip_path, [])
 
-        manager = ConversionManager(s3_bucket="test-bucket", package_options=PackageOptions(prefix="p"))
+        manager = ConversionManager(s3_bucket="test-bucket", package_options=PackageOptions())
         manager.start_conversion_process(
             dag_file_path=self.sample_dag_file, output_dir=self.temp_output_dir, user_validate=False
         )
@@ -293,7 +293,7 @@ class TestConversionManager(unittest.TestCase):
         self.assertIn("sql: /usr/local/airflow/dags/data/file.sql", yaml_text)
         yaml_path = self.temp_output_dir / "sample_dag.yaml"
         mock_upload.assert_called_once_with(
-            mock_boto3.client.return_value, "test-bucket", "p", "sample_dag", yaml_path, zip_path, None
+            mock_boto3.client.return_value, "test-bucket", "sample_dag", yaml_path, zip_path, None
         )
 
     @patch("dag_converter.conversion_manager.get_dag_object")

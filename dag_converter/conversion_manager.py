@@ -213,7 +213,6 @@ class ConversionManager:
                     upload_package(
                         self.s3_client,
                         self.s3_bucket,
-                        self.package_options.prefix,
                         dag_object.dag_id,
                         output_path,
                         zip_path,
