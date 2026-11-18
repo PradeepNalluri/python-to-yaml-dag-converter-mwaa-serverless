@@ -72,7 +72,7 @@ def get_converted_format(
             "dag_id": dag_id,
             "params": params_dict,
             "default_args": convert_default_args(getattr(dag_object, "default_args", {}), validator),
-            "schedule": convert_schedule(dag_object),
+            "schedule": convert_schedule(dag_object) or "None",
             "tasks": {},
         }
     }

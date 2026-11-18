@@ -53,3 +53,11 @@ class TestYamlFormat(unittest.TestCase):
         self.assertIn("    enabled: true", result)
         self.assertIn("    description: |", result)
         self.assertIn("      Multi", result)
+
+    def test_build_yaml_none_is_null(self):
+        """None is emitted as YAML null, not the string "None" (e.g. nested object fields)"""
+        data = {"schedule": "None", "profile_config": {"__type__": "x.ProfileConfig", "profiles_yml_filepath": None}}
+        result = build_yaml(data)
+        self.assertIn("schedule: None", result)
+        self.assertIn("profiles_yml_filepath: null", result)
+        self.assertIsNone(yaml.safe_load(result)["profile_config"]["profiles_yml_filepath"])

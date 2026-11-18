@@ -47,7 +47,7 @@ class TestCli(unittest.TestCase):
         result = runner.invoke(app, ["convert", str(self.sample_dag_path)])
 
         self.assertEqual(result.exit_code, 0)
-        mock_conversion_manager.assert_called_once_with(s3_bucket="")
+        mock_conversion_manager.assert_called_once_with(s3_bucket="", package_options=None)
         mock_manager.start_conversion_process.assert_called_once_with(
             dag_file_path=self.sample_dag_path, output_dir=Path("output_yaml/"), user_validate=True, debug=False
         )
@@ -76,7 +76,7 @@ class TestCli(unittest.TestCase):
         )
 
         self.assertEqual(result.exit_code, 0)
-        mock_conversion_manager.assert_called_once_with(s3_bucket=bucket_name)
+        mock_conversion_manager.assert_called_once_with(s3_bucket=bucket_name, package_options=None)
         mock_manager.start_conversion_process.assert_called_once_with(
             dag_file_path=self.sample_dag_path, output_dir=output_path, user_validate=False, debug=True
         )
@@ -107,7 +107,7 @@ class TestCli(unittest.TestCase):
         result = runner.invoke(app, ["convert", str(self.sample_dag_path), "--bucket", bucket_name])
 
         self.assertEqual(result.exit_code, 0)
-        mock_conversion_manager.assert_called_once_with(s3_bucket=bucket_name)
+        mock_conversion_manager.assert_called_once_with(s3_bucket=bucket_name, package_options=None)
 
     def test_convert_missing_input_path(self):
         """Test convert command fails when input path is missing."""
@@ -171,3 +171,52 @@ class TestCli(unittest.TestCase):
         call_args = mock_manager.start_conversion_process.call_args
         self.assertIsInstance(call_args.kwargs["dag_file_path"], Path)
         self.assertIsInstance(call_args.kwargs["output_dir"], Path)
+
+
+class TestCliNewOptions(unittest.TestCase):
+    def setUp(self):
+        self.sample_dag_path = Path("tests/unit/samples/aws_s3.py")
+
+    def test_help_lists_new_options(self):
+        result = runner.invoke(app, ["convert", "--help"])
+        options = ["--dag-folder", "--airflow-home", "--conn", "--var", "--requirements", "--package"]
+        for option in [*options, "--include", "--exclude"]:
+            self.assertIn(option, result.output)
+
+    @patch("dag_converter.conversion_manager.ConversionManager")
+    def test_banner_shows_interpreter_and_version(self, mock_conversion_manager):
+        import sys
+
+        from dag_converter import __version__
+
+        result = runner.invoke(app, ["convert", str(self.sample_dag_path)])
+        self.assertEqual(result.exit_code, 0)
+        self.assertIn(f"dag-converter {__version__}", result.output)
+        self.assertIn(sys.executable, result.output.replace("\n", ""))
+
+    @patch("dag_converter.conversion_manager.ConversionManager")
+    def test_package_options(self, mock_conversion_manager):
+        from dag_converter.code_package import PackageOptions
+
+        args = ["--package", "--include", "sql/*", "--exclude", "tmp", "--prefix", "p", "--conn", "a=sqlite://"]
+        result = runner.invoke(app, ["convert", str(self.sample_dag_path), *args, "--var", "k=v"])
+        self.assertEqual(result.exit_code, 0, result.output)
+        mock_conversion_manager.assert_called_once_with(
+            s3_bucket="", package_options=PackageOptions(includes=["sql/*"], excludes=["tmp"], prefix="p")
+        )
+
+    @patch("dag_converter.parse_env.parse_environment")
+    @patch("dag_converter.conversion_manager.ConversionManager")
+    def test_dag_folder_option(self, mock_conversion_manager, mock_parse_environment):
+        result = runner.invoke(app, ["convert", str(self.sample_dag_path), "--dag-folder", "tests"])
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(mock_parse_environment.call_args.kwargs["dag_folder"], Path("tests"))
+
+    @patch("dag_converter.requirements_env.run_in_requirements_env", return_value=0)
+    @patch("dag_converter.conversion_manager.ConversionManager")
+    def test_requirements_reruns_in_env(self, mock_conversion_manager, mock_run):
+        result = runner.invoke(app, ["convert", str(self.sample_dag_path), "--requirements", "req.txt"])
+        self.assertEqual(result.exit_code, 0)
+        mock_run.assert_called_once()
+        self.assertEqual(mock_run.call_args[0][0], Path("req.txt"))
+        mock_conversion_manager.assert_not_called()

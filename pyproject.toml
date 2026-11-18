@@ -19,10 +19,12 @@ classifiers = [
 ]
 dependencies = [
     "apache-airflow==3.0.6",
-    "apache-airflow-providers-amazon==9.30.0",
+    # Match the MWAA Serverless runtime; 9.38.0 requires Python 3.11+
+    "apache-airflow-providers-amazon==9.38.0; python_version >= '3.11'",
+    "apache-airflow-providers-amazon==9.30.0; python_version < '3.11'",
     "apache-airflow-providers-cncf-kubernetes==10.6.1",
     "boto3>=1.37.3",
-    "dag-factory==1.0.1",
+    "dag-factory==1.0.0",
     "rich>=13.7.1,<15.0.0",
     # Fastapi dependency issue https://github.com/apache/airflow/discussions/57769
     "fastapi[standard]==0.121.2",

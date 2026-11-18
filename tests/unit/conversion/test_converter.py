@@ -45,6 +45,21 @@ class TestGetConvertedFormat(unittest.TestCase):
         }
         self.assertEqual(result, expected)
 
+    @patch("dag_converter.conversion.converter.convert_tasks", return_value={})
+    @patch("dag_converter.conversion.converter.convert_schedule", return_value=None)
+    @patch("dag_converter.conversion.converter.convert_default_args", return_value={})
+    def test_no_schedule_is_string_none(self, mock_convert_default, mock_convert_schedule, mock_convert_tasks):
+        """dag-factory needs the string "None" for an unscheduled Dag (other None values become null)"""
+        dag_object = Mock()
+        dag_object.dag_id = "test_dag"
+        dag_object.params = {}
+        del dag_object._dag_id
+
+        with patch("builtins.dir", return_value=[]):
+            result = get_converted_format(self.mock_taskflow_parser, dag_object, "test.py", self.mock_validator)
+
+        self.assertEqual(result["test_dag"]["schedule"], "None")
+
     def test_get_dag_default_values(self):
         """Test that DAG default values are extracted"""
         defaults = get_dag_default_values()

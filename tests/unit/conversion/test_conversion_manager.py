@@ -2,6 +2,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -250,6 +251,53 @@ class TestConversionManager(unittest.TestCase):
         self.assertEqual(call_args[1], "test-bucket")  # bucket name
         self.assertEqual(call_args[2], "sample_dag.yaml")  # destination key
 
+    @patch("dag_converter.conversion_manager.upload_package")
+    @patch("dag_converter.conversion_manager.code_package.package_dag")
+    @patch("dag_converter.conversion_manager.code_package.discover_file_modules")
+    @patch("dag_converter.conversion_manager.boto3")
+    @patch("dag_converter.conversion_manager.get_dag_object")
+    @patch("dag_converter.conversion_manager.get_converted_format")
+    @patch("dag_converter.conversion_manager.ArgumentValidator")
+    @patch("dag_converter.conversion_manager.TaskFlowAnalyzer")
+    def test_package_and_upload(
+        self,
+        mock_taskflow,
+        mock_validator_class,
+        mock_convert,
+        mock_get_dag,
+        mock_boto3,
+        mock_discover,
+        mock_package,
+        mock_upload,
+    ):
+        """With --package, the zip is built, local paths are rewritten and both files are uploaded"""
+        from dag_converter.code_package import PackageOptions
+
+        mock_dag = Mock()
+        mock_dag.dag_id = "sample_dag"
+        mock_dag.tasks = []
+        mock_get_dag.return_value = [mock_dag]
+        local_path = self.temp_dir / "data" / "file.sql"
+        local_path.parent.mkdir()
+        local_path.write_text("select 1")
+        mock_convert.return_value = {"sample_dag": {"dag_id": "sample_dag", "sql": str(local_path)}}
+        zip_path = self.temp_output_dir / "sample_dag.zip"
+        mock_package.return_value = (zip_path, [])
+
+        manager = ConversionManager(s3_bucket="test-bucket", package_options=PackageOptions(prefix="p"))
+        manager.start_conversion_process(
+            dag_file_path=self.sample_dag_file, output_dir=self.temp_output_dir, user_validate=False
+        )
+
+        mock_package.assert_called_once()
+        yaml_text = (self.temp_output_dir / "sample_dag.yaml").read_text()
+        self.assertIn("sql: /usr/local/airflow/dags/data/file.sql", yaml_text)
+        yaml_path = self.temp_output_dir / "sample_dag.yaml"
+        mock_upload.assert_called_once_with(
+            mock_boto3.client.return_value, "test-bucket", "p", "sample_dag", yaml_path, zip_path
+        )
+        mock_boto3.client.return_value.upload_file.assert_not_called()
+
     @patch("dag_converter.conversion_manager.get_dag_object")
     @patch("dag_converter.conversion_manager.get_converted_format")
     @patch("dag_converter.conversion_manager.get_cleanup_dag")
@@ -321,6 +369,67 @@ class TestConversionManager(unittest.TestCase):
         with open(output_file2) as f:
             content2 = f.read()
             self.assertEqual(content2, "dag_id: dag_2\n")
+
+
+class TestConversionManagerPackage(unittest.TestCase):
+    """Real conversions with --package and validation (third-party packages are not installed)"""
+
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp_dir.name) / "dags"
+        (self.root / "helpers_cm").mkdir(parents=True)
+        (self.root / "helpers_cm" / "__init__.py").write_text("")
+        (self.root / "helpers_cm" / "mod.py").write_text("def func():\n    return 1\n")
+        (self.root / "not_a_dag.py").write_text("VALUE = 1\n")
+        self.output = Path(self.temp_dir.name) / "out"
+        sys.path.insert(0, str(self.root))
+
+    def tearDown(self):
+        sys.path.remove(str(self.root))
+        for name in [n for n in sys.modules if n.startswith("helpers_cm")]:
+            del sys.modules[name]
+        self.temp_dir.cleanup()
+
+    def convert(self, path):
+        from dag_converter.code_package import PackageOptions
+
+        with patch("dag_converter.code_package.third_party_distributions", return_value={}):
+            ConversionManager(s3_bucket=None, package_options=PackageOptions()).start_conversion_process(
+                dag_file_path=path, output_dir=self.output, user_validate=True
+            )
+
+    def test_multiple_dags_in_one_file_validate(self):
+        (self.root / "two_cm.py").write_text(
+            "from datetime import datetime\n"
+            "from airflow import DAG\n"
+            "from airflow.providers.standard.operators.python import PythonOperator\n"
+            "from helpers_cm.mod import func\n"
+            "for i in (1, 2):\n"
+            "    with DAG(f'cm_d{i}', start_date=datetime(2024, 1, 1), schedule=None) as dag:\n"
+            "        PythonOperator(task_id='t', python_callable=func)\n"
+            "    globals()[f'dag{i}'] = dag\n"
+        )
+        self.convert(self.root)
+        for dag_id in ("cm_d1", "cm_d2"):
+            self.assertIn("python_callable: helpers_cm.mod.func", (self.output / f"{dag_id}.yaml").read_text())
+            names = zipfile.ZipFile(self.output / f"{dag_id}.zip").namelist()
+            self.assertEqual(sorted(names), ["helpers_cm/__init__.py", "helpers_cm/mod.py"])
+        self.assertNotIn("helpers_cm.mod", sys.modules)
+
+    def test_subfolder_dag_callable(self):
+        (self.root / "sub").mkdir()
+        (self.root / "sub" / "sub_cm.py").write_text(
+            "from datetime import datetime\n"
+            "from airflow import DAG\n"
+            "from airflow.providers.standard.operators.python import PythonOperator\n"
+            "def hello():\n"
+            "    return 1\n"
+            "with DAG('sub_cm', start_date=datetime(2024, 1, 1), schedule=None) as dag:\n"
+            "    PythonOperator(task_id='t', python_callable=hello)\n"
+        )
+        self.convert(self.root / "sub" / "sub_cm.py")
+        self.assertIn("python_callable: sub.sub_cm.hello", (self.output / "sub_cm.yaml").read_text())
+        self.assertEqual(zipfile.ZipFile(self.output / "sub_cm.zip").namelist(), ["sub/sub_cm.py"])
 
 
 if __name__ == "__main__":

@@ -3,6 +3,12 @@ from pathlib import Path
 from airflow.models.dag import DAG
 from airflow.models.dagbag import DagBag
 
+from dag_converter.parse_env import import_error_hints
+
+
+class NoDagsFoundError(Exception):
+    """The file defines no Dags and has no import errors (e.g. a helper module)."""
+
 
 def get_dag_object(dag_file_path: Path) -> list[DAG]:
     """Load the Dags using DagBag and retrieve the Dag objects"""
@@ -14,11 +20,12 @@ def get_dag_object(dag_file_path: Path) -> list[DAG]:
 
     if dagbag.import_errors:
         details = "\n".join(f"{path}:\n{err}" for path, err in dagbag.import_errors.items())
+        details += import_error_hints(dagbag.import_errors)
         raise Exception(
             f"Failed to generate dag object for file {dag_file_path}. DagBag import errors:\n{details}"
         )
 
-    raise Exception(f"Failed to generate dag object for file {dag_file_path}")
+    raise NoDagsFoundError(f"Failed to generate dag object for file {dag_file_path}")
 
 
 def get_dag_factory_object(dag_file_path: Path) -> DAG:

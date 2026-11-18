@@ -8,7 +8,9 @@ from dag_converter.dag_comparator import compare_dags
 from dag_converter.dagbag import get_dag_factory_object
 
 
-def validate_yaml_with_dagbag(initial_dag_object: DAG | None, dag_yaml: str, input_file_path: Path):
+def validate_yaml_with_dagbag(
+    initial_dag_object: DAG | None, dag_yaml: str, input_file_path: Path, import_path: Path | None = None
+):
     """Validate the yaml using DagFactory and DagBag"""
 
     try:
@@ -26,7 +28,7 @@ def validate_yaml_with_dagbag(initial_dag_object: DAG | None, dag_yaml: str, inp
                 # Use new temporary directory to avoid caching issues
                 loader_path = dags_dir / "load_yaml_dags.py"
                 # Get the path to python_input directory
-                python_input_dir = input_file_path.parent
+                python_input_dir = import_path or input_file_path.parent
 
                 # Writes loader script for dag-factory. Loader script for each yaml is
                 # required in order to load converted YAML into Python DAG object for

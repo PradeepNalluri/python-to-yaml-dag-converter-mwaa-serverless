@@ -23,8 +23,8 @@ def build_yaml(cleaned_data: dict[str, Any]) -> str:
         return dumper.represent_dict(data)
 
     def represent_none(dumper, data: None):
-        """Handle NoneType. Use None instead of null"""
-        return dumper.represent_scalar("tag:yaml.org,2002:str", "None")
+        """Handle NoneType as YAML null (the Dag-level schedule is emitted as the string "None" by the converter)"""
+        return dumper.represent_scalar("tag:yaml.org,2002:null", "null")
 
     CustomDumper.add_representer(str, str_presenter)
     CustomDumper.add_representer(dict, dict_presenter)
