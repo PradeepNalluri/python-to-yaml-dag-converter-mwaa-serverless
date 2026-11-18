@@ -11,6 +11,7 @@ from airflow.secrets.environment_variables import EnvironmentVariablesBackend
 from airflow.secrets.metastore import MetastoreBackend
 from airflow.utils.module_loading import import_string
 
+from dag_converter.console_config import print_warning
 from dag_converter.parse_env import WRAPPED_BACKEND_ENV, WRAPPED_BACKEND_KWARGS_ENV, state
 
 
@@ -22,8 +23,11 @@ class ParseSecretsBackend(BaseSecretsBackend):
         self.wrapped = None
         wrapped_path = os.environ.get(WRAPPED_BACKEND_ENV)
         if wrapped_path:
-            kwargs = json.loads(os.environ.get(WRAPPED_BACKEND_KWARGS_ENV) or "{}")
-            self.wrapped = import_string(wrapped_path)(**kwargs)
+            try:
+                kwargs = json.loads(os.environ.get(WRAPPED_BACKEND_KWARGS_ENV) or "{}")
+                self.wrapped = import_string(wrapped_path)(**kwargs)
+            except Exception as e:
+                print_warning(f"Could not start the secrets backend {wrapped_path} ({e}); parsing without it")
 
     def _from_wrapped(self, method: str, key: str):
         try:

@@ -107,6 +107,11 @@ class TestPaths(unittest.TestCase):
         self.assertEqual(list((self.root / "project").iterdir()), [self.root / "project" / "dags"])
 
 
+class FailingBackend:
+    def __init__(self, **kwargs):
+        raise RuntimeError("no credentials")
+
+
 class TestSecretsBackend(unittest.TestCase):
     def setUp(self):
         parse_env.state.temp_db_url = "sqlite:////nonexistent"
@@ -139,6 +144,23 @@ class TestSecretsBackend(unittest.TestCase):
         with patch.dict(os.environ, {"AIRFLOW_VAR_FROM_USER": "env"}):
             self.assertEqual(self.backend.get_variable("from_user"), "u")
         self.assertIsNone(self.backend.get_config("x"))
+
+    def test_wrapped_backend_that_fails_to_start_is_skipped(self):
+        env = {
+            parse_env.WRAPPED_BACKEND_ENV: f"{__name__}.FailingBackend",
+            parse_env.WRAPPED_BACKEND_KWARGS_ENV: '{"region_name": "x"}',
+            "AIRFLOW_VAR_FROM_ENV": "env",
+        }
+        with patch.dict(os.environ, env), patch.object(parse_secrets, "print_warning") as warn:
+            backend = parse_secrets.ParseSecretsBackend()
+            self.assertIsNone(backend.wrapped)
+            self.assertEqual(backend.get_variable("from_env"), "env")
+        self.assertIsNone(backend.get_variable("missing"))
+        self.assertIsNone(backend.get_connection("missing"))
+        self.assertIsNone(backend.get_config("x"))
+        warn.assert_called_once()
+        self.assertIn("FailingBackend", warn.call_args.args[0])
+        self.assertIn("no credentials", warn.call_args.args[0])
 
 
 class TestImportErrorHints(unittest.TestCase):
