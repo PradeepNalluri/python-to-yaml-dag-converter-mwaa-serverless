@@ -375,6 +375,25 @@ class TestThirdParty(unittest.TestCase):
             dists = code_package.third_party_distributions({"os", "json", "airflow.models", "yaml", "boto3"})
         self.assertEqual(dists, {})
 
+    def test_provider_distribution(self):
+        module = "airflow.providers.cncf.kubernetes.operators.pod"
+        self.assertEqual(code_package._provider_distribution(module), "apache-airflow-providers-cncf-kubernetes")
+        self.assertEqual(
+            code_package._provider_distribution("airflow.providers.amazon.aws.hooks.s3"),
+            "apache-airflow-providers-amazon",
+        )
+        self.assertIsNone(code_package._provider_distribution("airflow.providers.not_installed.hooks.x"))
+
+    def test_bundles_provider_that_is_not_preinstalled(self):
+        # cncf-kubernetes is installed with the converter but is not part of the service runtime
+        with patch.object(code_package, "print_warning"):
+            dists = code_package.third_party_distributions(
+                {"airflow.providers.cncf.kubernetes.operators.pod", "airflow.providers.amazon.aws.hooks.s3"}
+            )
+        self.assertIn("apache-airflow-providers-cncf-kubernetes", dists)
+        self.assertNotIn("apache-airflow-providers-amazon", dists)
+        self.assertNotIn("apache-airflow", dists)
+
     def test_bundles_non_preinstalled_package(self):
         # pytest is a dev dependency that is not part of the service runtime
         with patch.object(code_package, "print_warning"):

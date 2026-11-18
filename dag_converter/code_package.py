@@ -448,12 +448,32 @@ def service_provided() -> set[str]:
     return dependency_closure(set(runtime.PREINSTALLED_PACKAGES)) | {"apache-airflow"}
 
 
+def _provider_distribution(module_name: str) -> str | None:
+    """Installed provider distribution owning ``airflow.providers.<a>.<b>...``.
+
+    E.g. ``airflow.providers.cncf.kubernetes.operators.pod`` -> ``apache-airflow-providers-cncf-kubernetes``."""
+    parts = module_name.split(".")[2:]
+    for end in range(len(parts), 0, -1):
+        name = "apache-airflow-providers-" + "-".join(parts[:end])
+        try:
+            importlib.metadata.distribution(name)
+        except importlib.metadata.PackageNotFoundError:
+            continue
+        return runtime.normalize_name(name)
+    return None
+
+
 def third_party_distributions(module_names: set[str]) -> dict[str, str]:
     """Map imported modules to the distributions to bundle: {normalized name: local version}."""
     top_levels = {name.split(".")[0] for name in module_names}
     mapping = importlib.metadata.packages_distributions()
     provided = service_provided()
-    requested: set[str] = set()
+    # Providers live under the "airflow" namespace shared with core, so map them by module path instead
+    requested: set[str] = {
+        dist
+        for name in module_names
+        if name.startswith("airflow.providers.") and (dist := _provider_distribution(name))
+    }
     for top in sorted(top_levels):
         if top in sys.stdlib_module_names or top in ("airflow", "dag_converter", "__future__"):
             continue
