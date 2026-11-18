@@ -372,6 +372,15 @@ class TestThirdParty(unittest.TestCase):
         with patch.object(code_package.importlib.metadata, "requires", side_effect=lambda n: requires.get(n, [])):
             self.assertEqual(code_package.dependency_closure({"a"}), {"a", "b", "e"})
 
+    def test_requirements_of_preinstalled_package_not_installed_locally(self):
+        def requires(name):
+            if name == "apache-airflow-providers-duckdb":
+                raise code_package.importlib.metadata.PackageNotFoundError(name)
+            return []  # e.g. providers-amazon, which also requires common-sql, contributes nothing here
+
+        with patch.object(code_package.importlib.metadata, "requires", side_effect=requires):
+            self.assertIn("apache-airflow-providers-common-sql", code_package.service_provided())
+
     def test_excludes_stdlib_airflow_and_preinstalled(self):
         with patch.object(code_package, "print_warning"):
             dists = code_package.third_party_distributions({"os", "json", "airflow.models", "yaml", "boto3"})

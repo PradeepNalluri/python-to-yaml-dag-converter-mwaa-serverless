@@ -34,6 +34,11 @@ PREINSTALLED_PACKAGES: dict[str, str | None] = {
     "pyyaml": None,
     "lz4": "4.4.4",
 }
+# Runtime requirements of pre-installed packages that are not dependencies of the converter, used when they are
+# not installed locally (from their PyPI metadata; duckdb and lz4 have none outside extras)
+PREINSTALLED_REQUIREMENTS: dict[str, list[str]] = {
+    "apache-airflow-providers-duckdb": ["apache-airflow", "apache-airflow-providers-common-sql", "duckdb"],
+}
 
 
 def normalize_name(name: str) -> str:

@@ -403,7 +403,7 @@ def _requirements_of(dist_name: str) -> list[str]:
     try:
         requires = importlib.metadata.requires(dist_name) or []
     except importlib.metadata.PackageNotFoundError:
-        return []
+        return runtime.PREINSTALLED_REQUIREMENTS.get(runtime.normalize_name(dist_name), [])
     env = {**default_environment(), **TARGET_MARKERS}
     names = []
     for line in requires:
