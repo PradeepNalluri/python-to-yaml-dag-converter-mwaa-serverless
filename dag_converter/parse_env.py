@@ -3,8 +3,7 @@
 Sets up, for the duration of a conversion:
 * AIRFLOW_HOME, unless set (the folder containing ``dags/``, otherwise the current directory)
 * a throwaway SQLite metadata database, unless one is configured
-* a secrets backend (``parse_secrets``) that wraps the user's backend and returns placeholder
-  Connections and Variables for anything that is not otherwise defined
+* a secrets backend (``parse_secrets``) that wraps the user's backend
 * a throwaway Cosmos cache dir, and no ``__pycache__`` written into the project
 
 Environment variables are set before Airflow is imported (the CLI imports Airflow lazily),
@@ -52,9 +51,6 @@ class _State:
 
     temp_db_url: str | None = None
     db_ready = False
-    requested_conn_ids: set[str] = set()
-    stubbed_conn_ids: set[str] = set()
-    stubbed_var_keys: set[str] = set()
 
 
 state = _State
@@ -138,10 +134,6 @@ def parse_environment(input_path: Path) -> Iterator[None]:
     os.environ[SECRETS_BACKEND_ENV] = SECRETS_BACKEND_PATH
     os.environ[SECRETS_BACKEND_KWARGS_ENV] = "{}"
 
-    state.requested_conn_ids = set()
-    state.stubbed_conn_ids = set()
-    state.stubbed_var_keys = set()
-
     # Mirror the service, where the Dag folder root is on the import path
     dag_root = str(find_dag_root(input_path))
     old_sys_path = list(sys.path)
@@ -165,20 +157,6 @@ def parse_environment(input_path: Path) -> Iterator[None]:
         if reconfigure:
             _configure_orm()
         shutil.rmtree(temp_dir, ignore_errors=True)
-        if state.stubbed_conn_ids:
-            print_warning(
-                "Placeholder Connections were used for " + ", ".join(sorted(state.stubbed_conn_ids)) + ". Values "
-                "derived from them at parse time (e.g. hostnames in templated strings) are placeholders in the "
-                "YAML. Set AIRFLOW_CONN_<ID> or use a secrets backend for real values."
-            )
-        if state.stubbed_var_keys:
-            keys = sorted(state.stubbed_var_keys)
-            print_warning(
-                "Placeholder Variables were used for " + ", ".join(keys) + ". If the Dag's structure or task "
-                "values depend on them, the YAML contains the placeholder. Read them with a Jinja template "
-                f"(e.g. '{{{{ var.value.{keys[0]} }}}}') in the Dag, or set AIRFLOW_VAR_<KEY> to the real value "
-                "before converting."
-            )
 
 
 def _configure_orm() -> None:

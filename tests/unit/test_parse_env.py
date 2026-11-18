@@ -91,16 +91,6 @@ class TestPaths(unittest.TestCase):
             self.assertEqual(os.environ[parse_env.WRAPPED_BACKEND_KWARGS_ENV], '{"a": 1}')
             self.assertNotIn(parse_env.COSMOS_CACHE_DIR_ENV, os.environ)
 
-    def test_placeholder_warnings_on_exit(self):
-        with patch.object(parse_env, "print_warning") as warn, parse_environment(self.dag_file):
-            parse_env.state.stubbed_conn_ids.add("db")
-            parse_env.state.stubbed_var_keys.update({"missing", "other"})
-        conn_warning, var_warning = (call[0][0] for call in warn.call_args_list)
-        self.assertIn("AIRFLOW_CONN_<ID>", conn_warning)
-        self.assertIn("missing, other", var_warning)
-        self.assertIn("{{ var.value.missing }}", var_warning)
-        self.assertIn("AIRFLOW_VAR_<KEY>", var_warning)
-
     @patch.dict(os.environ, {}, clear=False)
     def test_metadata_db_is_initialized_in_temp_dir(self):
         import sqlite3
@@ -121,45 +111,21 @@ class TestSecretsBackend(unittest.TestCase):
     def setUp(self):
         parse_env.state.temp_db_url = "sqlite:////nonexistent"
         parse_env.state.db_ready = False
-        parse_env.state.stubbed_conn_ids, parse_env.state.stubbed_var_keys = set(), set()
         self.backend = parse_secrets.ParseSecretsBackend()
 
     def tearDown(self):
         parse_env.state.temp_db_url = None
 
-    def test_environment_connection_used_before_placeholder(self):
+    def test_environment_connection(self):
         with patch.dict(os.environ, {"AIRFLOW_CONN_FROM_ENV": "mysql://u:p@envhost/db"}):
             conn = self.backend.get_connection("from_env")
         self.assertEqual(conn.host, "envhost")
-        self.assertNotIn("from_env", parse_env.state.stubbed_conn_ids)
 
-    def test_placeholder_for_undefined_connection(self):
-        with patch.object(parse_secrets, "print_warning") as warn:
-            conn = self.backend.get_connection("my-redshift-conn")
-        self.assertEqual(conn.conn_id, "my-redshift-conn")
-        self.assertEqual(conn.conn_type, "generic")
-        self.assertEqual(conn.host, "placeholder")
-        self.assertIn("my-redshift-conn", parse_env.state.stubbed_conn_ids)
-        self.assertIn("AIRFLOW_CONN_MY-REDSHIFT-CONN", warn.call_args[0][0])
-
-    def test_placeholder_for_missing_variable(self):
-        self.assertEqual(self.backend.get_variable("missing"), "placeholder")
-        self.assertEqual(parse_env.state.stubbed_var_keys, {"missing"})
-        self.assertIsNone(self.backend.get_variable("cosmos_cache__my_dag"))
-
-    def test_variable_get_default_wins_over_placeholder(self):
-        from airflow.models.variable import Variable
-
-        with patch("airflow.models.variable.ensure_secrets_loaded", return_value=[self.backend]):
-            self.assertEqual(Variable.get("with_default", default_var="dev"), "dev")
-            self.assertIsNone(Variable.get("none_default", default_var=None))
-            self.assertEqual(Variable.get("no_default"), "placeholder")
-        self.assertEqual(parse_env.state.stubbed_var_keys, {"no_default"})
-
-    def test_environment_variable_used_before_placeholder(self):
+    def test_environment_variable_and_missing_values(self):
         with patch.dict(os.environ, {"AIRFLOW_VAR_X": "real"}):
             self.assertEqual(self.backend.get_variable("x"), "real")
-        self.assertEqual(parse_env.state.stubbed_var_keys, set())
+        self.assertIsNone(self.backend.get_variable("missing"))
+        self.assertIsNone(self.backend.get_connection("missing"))
 
     def test_wrapped_backend_is_consulted_for_variables_and_config(self):
         class UserBackend:
@@ -172,7 +138,6 @@ class TestSecretsBackend(unittest.TestCase):
         self.backend.wrapped = UserBackend()
         with patch.dict(os.environ, {"AIRFLOW_VAR_FROM_USER": "env"}):
             self.assertEqual(self.backend.get_variable("from_user"), "u")
-        self.assertEqual(self.backend.get_variable("missing"), "placeholder")
         self.assertIsNone(self.backend.get_config("x"))
 
 

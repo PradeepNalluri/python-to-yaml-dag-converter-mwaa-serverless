@@ -293,7 +293,7 @@ class TestConversionManager(unittest.TestCase):
         self.assertIn("sql: /usr/local/airflow/dags/data/file.sql", yaml_text)
         yaml_path = self.temp_output_dir / "sample_dag.yaml"
         mock_upload.assert_called_once_with(
-            mock_boto3.client.return_value, "test-bucket", "p", "sample_dag", yaml_path, zip_path
+            mock_boto3.client.return_value, "test-bucket", "p", "sample_dag", yaml_path, zip_path, None
         )
 
     @patch("dag_converter.conversion_manager.get_dag_object")

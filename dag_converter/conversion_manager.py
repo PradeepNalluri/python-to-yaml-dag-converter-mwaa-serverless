@@ -4,14 +4,14 @@ from pathlib import Path
 
 import boto3
 
-from dag_converter import code_package, compat_checks, parse_env
+from dag_converter import code_package, compat_checks, parse_env, runtime_lookups
 from dag_converter.cleanup import get_cleanup_dag
 from dag_converter.console_config import print_error, print_info, print_progress, print_success, print_warning
 from dag_converter.conversion.converter import get_converted_format
 from dag_converter.dagbag import NoDagsFoundError, get_dag_object
 from dag_converter.schema_parser import ArgumentValidator
 from dag_converter.taskflow_parser import TaskFlowAnalyzer
-from dag_converter.upload import upload_package
+from dag_converter.upload import secrets_environment, upload_package
 from dag_converter.yaml_format import build_yaml
 from dag_converter.yaml_validator import validate_yaml_with_dagbag
 
@@ -26,6 +26,8 @@ class ConversionManager:
         self.s3_bucket = s3_bucket
         self.package_options = package_options or code_package.PackageOptions()
         self._dag_files: set[Path] = set()
+        self._runtime_conn_ids: set[str] = set()
+        self._runtime_var_keys: set[str] = set()
         if s3_bucket:
             self.s3_client = boto3.client("s3")
 
@@ -37,7 +39,13 @@ class ConversionManager:
         output_dir.mkdir(parents=True, exist_ok=True)
         self._dag_files = {dag_file_path} if dag_file_path.is_file() else set(dag_file_path.glob("*.py"))
         parse_env.ensure_metadata_db()
+        self._runtime_conn_ids, self._runtime_var_keys = set(), set()
+        try:
+            self._convert_files(dag_file_path, output_dir, user_validate, debug)
+        finally:
+            compat_checks.print_runtime_notice(self._runtime_conn_ids, self._runtime_var_keys)
 
+    def _convert_files(self, dag_file_path: Path, output_dir: Path, user_validate: bool, debug: bool) -> None:
         if dag_file_path.is_file():
             self.start_file_conversion_process(
                 dag_file_path=dag_file_path, output_dir=output_dir, user_validate=user_validate
@@ -74,20 +82,53 @@ class ConversionManager:
         finally:
             code_package.evict_local_modules(parse_env.find_dag_root(dag_file_path))
 
+    def _parse(self, dag_file_path: Path, dag_root: Path, validator: ArgumentValidator):
+        """Parse and convert the Dag file with run-time Connection and Variable lookups; parse it a second time,
+        with their concrete values, if the Dag consumed some of them while parsing (e.g. in a comparison)."""
+        taskflow_parser = TaskFlowAnalyzer(dag_file_path)
+        frozen: set[tuple] = set()
+        for attempt in range(2):
+            with runtime_lookups.patched(frozen) as lookups:
+                try:
+                    dag_objects = get_dag_object(dag_file_path)
+                except NoDagsFoundError:
+                    raise
+                except Exception:
+                    if attempt or not lookups.markers:
+                        raise
+                    # e.g. datetime.strptime(Variable.get(...)): parse again with all the concrete values
+                    frozen = {lookup.ident for lookup in lookups.markers.values()}
+                    code_package.evict_local_modules(dag_root)
+                    continue
+                lookups.parsing = False
+                converted = [
+                    (dag, get_cleanup_dag(get_converted_format(taskflow_parser, dag, dag_file_path, validator)))
+                    for dag in dag_objects
+                ]
+            ids = [id_ for dag in dag_objects for id_ in (dag.dag_id, *(task.task_id for task in dag.tasks))]
+            consumed = lookups.consumed([dag_dict for _, dag_dict in converted], ids)
+            if attempt or not consumed:
+                break
+            frozen = consumed
+            code_package.evict_local_modules(dag_root)
+        lookups.warn_logic()
+        return converted, lookups
+
     def _convert_file(self, dag_file_path: Path, output_dir: Path, user_validate: bool, debug: bool) -> list[str]:
         schema_file_path = Path(__file__).absolute().parent / VALIDATOR_SCHEMA_FILE
         validator = ArgumentValidator(schema_file_path)
 
         dag_root = parse_env.find_dag_root(dag_file_path)
         module_snapshot = set(sys.modules)
-        dag_object_list = get_dag_object(dag_file_path)
+        converted, lookups = self._parse(dag_file_path, dag_root, validator)
+        dag_object_list = [dag_object for dag_object, _ in converted]
         file_modules = code_package.discover_file_modules(dag_file_path, dag_root, module_snapshot)
 
         result_output_files: list[Path] = []
         result_output_yaml = []
 
         # Supports multiple Dags in a single file
-        for dag_object in dag_object_list:
+        for dag_object, dag_cleaned in converted:
             # Output each Dag in a different file
             output_path = output_dir / f"{dag_object.dag_id}{YAML_EXTENSION}"
             result_output_files.append(output_path)
@@ -110,9 +151,7 @@ class ConversionManager:
                                 f.write(f"  {attr_name}: <Error accessing attribute: {e}>\n")
                         f.write("\n")
 
-            taskflow_parser = TaskFlowAnalyzer(dag_file_path)
-            dag_formatted = get_converted_format(taskflow_parser, dag_object, dag_file_path, validator)
-            dag_cleaned = get_cleanup_dag(dag_formatted)
+            dag_cleaned = lookups.resolve(dag_cleaned, dag_object)
             # Local paths are validated as they are; with a zip, against its extracted copy
             validation_dict = code_package.rewrite_module_refs(dag_cleaned, dag_file_path, dag_root)
             zip_path, py_sources = code_package.package_dag(
@@ -127,9 +166,13 @@ class ConversionManager:
             )
             py_sources = [dag_file_path, *py_sources]
             dag_cleaned = code_package.rewrite_paths(validation_dict, dag_root)
-            compat_checks.run_checks(dag_object, dag_cleaned, py_sources, parse_env.state.requested_conn_ids)
+            compat_checks.run_checks(dag_object, py_sources)
             code_package.warn_local_paths(dag_cleaned, [str(dag_root)])
             dag_yaml = build_yaml(dag_cleaned)
+            runtime_lookups.assert_no_markers(dag_yaml)
+            conn_ids, var_keys = compat_checks.runtime_references(dag_cleaned)
+            conn_ids |= lookups.conn_ids - compat_checks.DEFAULT_CONNECTIONS
+            var_keys |= lookups.var_keys
 
             # Validation with Dag Factory
             is_valid = True
@@ -174,7 +217,10 @@ class ConversionManager:
                         dag_object.dag_id,
                         output_path,
                         zip_path,
+                        secrets_environment() if conn_ids or var_keys else None,
                     )
+                self._runtime_conn_ids |= conn_ids
+                self._runtime_var_keys |= var_keys
 
             print_info("\n\n----------------------------------------------------------------------------------\n\n")
             result_output_yaml.append(dag_yaml)

@@ -1,5 +1,7 @@
 """Tests for upload module (mocked S3 client only)."""
 
+import json
+import shlex
 import tempfile
 import unittest
 from pathlib import Path
@@ -62,3 +64,32 @@ class TestUpload(unittest.TestCase):
         self.assertIn('"ObjectKey": "team/dags/my_dag.yaml", "VersionId": "v-yaml"', command)
         self.assertNotIn("--code", command)
         self.assertIn("--role-arn <EXECUTION_ROLE_ARN>", command)
+
+    def test_create_workflow_command_environment(self):
+        definition = {"Bucket": "b", "ObjectKey": "dags/d.yaml"}
+        self.assertNotIn("--environment", upload.create_workflow_command("d", definition, None))
+        for region, expected in (("eu-west-1", "eu-west-1"), (None, "<region>")):
+            with patch.object(upload.boto3.session.Session, "region_name", region):
+                command = upload.create_workflow_command("d", definition, None, upload.secrets_environment())
+            args = shlex.split(command.replace("\\\n", " "))
+            environment = json.loads(args[args.index("--environment") + 1])
+            variables = environment["Variables"]
+            self.assertEqual(
+                variables["AIRFLOW__WORKERS__SECRETS_BACKEND"],
+                "airflow.providers.amazon.aws.secrets.secrets_manager.SecretsManagerBackend",
+            )
+            self.assertEqual(
+                json.loads(variables["AIRFLOW__WORKERS__SECRETS_BACKEND_KWARGS"]),
+                {
+                    "connections_prefix": "airflow/connections",
+                    "variables_prefix": "airflow/variables",
+                    "region_name": expected,
+                },
+            )
+        expected_option = (
+            """--environment '{"Variables": {"AIRFLOW__WORKERS__SECRETS_BACKEND": """
+            """"airflow.providers.amazon.aws.secrets.secrets_manager.SecretsManagerBackend", """
+            """"AIRFLOW__WORKERS__SECRETS_BACKEND_KWARGS": "{\\"connections_prefix\\": \\"airflow/connections\\", """
+            """\\"variables_prefix\\": \\"airflow/variables\\", \\"region_name\\": \\"<region>\\"}"}}'"""
+        )
+        self.assertIn(expected_option, command)

@@ -38,15 +38,49 @@ class TestCompatChecks(unittest.TestCase):
         for key in ["'AIRFLOW_HOME'", "'MY-KEY'", "'AWS_REGION'"]:
             self.assertIn(key, messages)
 
-    def test_conn_ids(self):
+    def test_runtime_references(self):
         dag = {
-            "d": {"tasks": {"t": {"conn_id": "my-db", "aws_conn_id": "aws_default", "nested": [{"x_conn_id": "a.b"}]}}}
+            "d": {
+                "tasks": {
+                    "t": {
+                        "conn_id": "my-db",
+                        "aws_conn_id": "aws_default",
+                        "profile_config": {"profile_mapping": {"__type__": "x.Mapping", "conn_id": "dbt-conn"}},
+                        "bash_command": "echo {{ conn.pg.host }} {{ conn.get('my-api').login }} conn.not_jinja",
+                        "sql": "{{ conn['c-3'].host }}",
+                        "env": {
+                            "A": "{{ var.value.env }}-{{ var.value.get('mode', 'a') }}-{{ var.json.cfg.x }}",
+                            "B": "{{ var.value['k-1'] }}",
+                        },
+                    }
+                }
+            }
         }
-        self.assertEqual(compat_checks.conn_ids_in(dag), {"my-db", "aws_default", "a.b"})
+        conn_ids, var_keys = compat_checks.runtime_references(dag)
+        self.assertEqual(conn_ids, {"my-db", "dbt-conn", "pg", "my-api", "c-3"})
+        self.assertEqual(var_keys, {"env", "mode", "cfg", "k-1"})
+
+    def test_runtime_notice(self):
         with patch.object(compat_checks, "print_warning") as warn:
-            compat_checks.check_conn_ids(compat_checks.conn_ids_in(dag))
-        self.assertEqual(warn.call_count, 2)
-        self.assertIn("Secrets Manager", warn.call_args[0][0])
+            compat_checks.print_runtime_notice({"aws_default", "duckdb_default"}, set())
+        warn.assert_not_called()
+        with patch.object(compat_checks, "print_warning") as warn:
+            compat_checks.print_runtime_notice({"aws_default", "my-db", "pg"}, {"env"})
+        warn.assert_called_once()
+        notice = warn.call_args[0][0]
+        self.assertNotIn("aws_default", notice)
+        for text in [
+            "airflow/connections/my-db",
+            "/airflow/connections/pg",
+            "airflow/variables/env",
+            "/airflow/variables/env",
+            "secretsmanager:GetSecretValue",
+            "ssm:GetParameter",
+            compat_checks.PARAMETER_STORE_BACKEND,
+            compat_checks.CONNECTIONS_DOCS,
+        ]:
+            self.assertIn(text, notice)
+        self.assertIn("Connection ids my-db cannot be provided as AIRFLOW_CONN_*", notice)
 
     def test_deferrable(self):
         dag = SimpleNamespace(
@@ -60,5 +94,5 @@ class TestCompatChecks(unittest.TestCase):
 
     def test_run_checks_never_raises(self):
         with patch.object(compat_checks, "print_warning") as warn:
-            compat_checks.run_checks(object(), {}, [123], [])
+            compat_checks.run_checks(object(), [123])
         self.assertIn("Skipped", warn.call_args[0][0])
