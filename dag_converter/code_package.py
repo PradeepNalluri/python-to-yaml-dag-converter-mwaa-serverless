@@ -158,27 +158,25 @@ def resolve_module(name: str, dag_root: Path) -> Path | None:
     return None
 
 
-def local_modules_loaded_since(snapshot: set[str], dag_root: Path) -> set[Path]:
-    """Files of local modules imported since ``snapshot`` (excluding the Dag file module itself)."""
-    found = set()
-    for name, module in list(sys.modules.items()):
-        if name in snapshot or name.startswith("unusual_prefix_"):
-            continue
-        file = getattr(module, "__file__", None)
-        if file and _is_local_module_file(file, dag_root):
-            found.add(Path(os.path.abspath(file)))
-    return found
-
-
-def evict_local_modules(dag_root: Path) -> dict[str, Any]:
-    """Drop local modules from sys.modules so the next Dag file (or validation) re-imports them."""
-    removed = {
+def _local_modules(dag_root: Path) -> dict[str, Any]:
+    """Loaded local modules (excluding Dag file modules, which DagBag names ``unusual_prefix_*``)."""
+    return {
         name: module
         for name, module in list(sys.modules.items())
         if not name.startswith("unusual_prefix_")
         and getattr(module, "__file__", None)
         and _is_local_module_file(module.__file__, dag_root)
     }
+
+
+def local_modules_loaded_since(snapshot: set[str], dag_root: Path) -> set[Path]:
+    """Files of local modules imported since ``snapshot``."""
+    return {Path(os.path.abspath(m.__file__)) for name, m in _local_modules(dag_root).items() if name not in snapshot}
+
+
+def evict_local_modules(dag_root: Path) -> dict[str, Any]:
+    """Drop local modules from sys.modules so the next Dag file (or validation) re-imports them."""
+    removed = _local_modules(dag_root)
     for name in removed:
         del sys.modules[name]
     return removed
