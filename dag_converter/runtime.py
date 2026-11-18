@@ -41,10 +41,6 @@ def normalize_name(name: str) -> str:
     return re.sub(r"[-_.]+", "-", name).lower()
 
 
-def is_preinstalled(name: str) -> bool:
-    return normalize_name(name) in PREINSTALLED_PACKAGES
-
-
 def cache_dir() -> Path:
     """User cache directory for dag-converter (virtualenvs, constraints, staged wheels)."""
     base = os.environ.get("XDG_CACHE_HOME") or str(Path.home() / ".cache")

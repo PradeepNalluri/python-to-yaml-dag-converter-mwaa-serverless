@@ -108,12 +108,7 @@ def _is_secret(rel: str) -> bool:
     return any(fnmatch.fnmatch(rel.rsplit("/", 1)[-1], p) for p in SECRET_FILE_PATTERNS)
 
 
-def is_excluded(
-    path: Path,
-    dag_root: Path,
-    excluded_files: set[Path],
-    output_dir: Path | None,
-) -> bool:
+def is_excluded(path: Path, dag_root: Path, excluded_files: set[Path], output_dir: Path) -> bool:
     rel = relative_to_root(path, dag_root)
     if not rel:
         return True
@@ -125,10 +120,9 @@ def is_excluded(
     real = path.resolve()
     if real in excluded_files:
         return True
-    if output_dir is not None:
-        out = Path(output_dir).resolve()
-        if real == out or out in real.parents:
-            return True
+    out = Path(output_dir).resolve()
+    if real == out or out in real.parents:
+        return True
     return _in_venv(path, dag_root)
 
 
@@ -439,7 +433,7 @@ def dependency_closure(names: set[str]) -> set[str]:
 
 def service_provided() -> set[str]:
     """Distributions available on the service: the pre-installed packages and their dependencies."""
-    return dependency_closure(set(runtime.PREINSTALLED_PACKAGES)) | {"apache-airflow"}
+    return dependency_closure(set(runtime.PREINSTALLED_PACKAGES))
 
 
 def _provider_distribution(module_name: str) -> str | None:
@@ -568,7 +562,7 @@ def build_zip(zip_path: Path, local_files: dict[str, Path], staged: dict[str, Pa
 
     dist_infos = {runtime.normalize_name(a.split("/")[0].split("-")[0]) for a in entries if ".dist-info/" in a}
     for name in sorted(dist_infos):
-        if runtime.is_preinstalled(name):
+        if name in runtime.PREINSTALLED_PACKAGES:
             print_warning(
                 f"The code package bundles {name}, which is pre-installed on MWAA Serverless; "
                 "the pre-installed version takes precedence"
