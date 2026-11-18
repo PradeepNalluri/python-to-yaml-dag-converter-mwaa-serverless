@@ -40,8 +40,8 @@ class TestRequirementsEnv(unittest.TestCase):
         self.assertIn("apache-airflow-providers-amazon 9.38.0", messages)
 
     def test_strip_requirements_arg(self):
-        argv = ["convert", "dag.py", "--requirements", "req.txt", "--package", "--requirements=other.txt"]
-        self.assertEqual(strip_requirements_arg(argv), ["convert", "dag.py", "--package"])
+        argv = ["convert", "dag.py", "--requirements", "req.txt", "--no-validate", "--requirements=other.txt"]
+        self.assertEqual(strip_requirements_arg(argv), ["convert", "dag.py", "--no-validate"])
 
     def test_reruns_command_in_env(self):
         with tempfile.TemporaryDirectory() as temp_dir:

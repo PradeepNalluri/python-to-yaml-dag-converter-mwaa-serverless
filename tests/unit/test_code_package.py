@@ -214,6 +214,29 @@ class TestZip(PackagingTestCase):
             )
         return set(zipfile.ZipFile(zip_path).namelist()), " ".join(c.args[0] for c in warn.call_args_list)
 
+    def test_no_package_when_nothing_to_bundle(self):
+        out = Path(self.temp_dir.name) / "output"
+        out.mkdir()
+        with (
+            patch.object(code_package, "third_party_distributions", return_value={}),
+            patch.object(code_package, "stage_distributions") as stage,
+            patch.object(code_package, "print_info") as info,
+        ):
+            result = package_dag(
+                {"d": {"bash_command": "echo hi"}},
+                "d",
+                self.dag_file,
+                self.root,
+                (set(), set()),
+                PackageOptions(),
+                out,
+                {self.dag_file},
+            )
+        self.assertEqual(result, (None, []))
+        stage.assert_not_called()
+        self.assertFalse((out / "d.zip").exists())
+        info.assert_called_once_with("No code package needed for d")
+
     def test_secrets_are_skipped_with_warning_unless_included(self):
         dag = {"d": {"searchpath": str(self.root / "scripts")}}
         names, warnings = self.package(dag)

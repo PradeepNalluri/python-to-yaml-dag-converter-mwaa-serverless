@@ -29,14 +29,13 @@ def convert(
     requirements: Annotated[
         Path | None, typer.Option(help="requirements.txt of the Dags; parse inside a cached virtualenv with them")
     ] = None,
-    package: Annotated[bool, typer.Option(help="Also build a <output>/<dag_id>.zip code package per Dag")] = False,
     include: Annotated[
-        list[str] | None, typer.Option(help="With --package: glob relative to the Dag folder to add (repeatable)")
+        list[str] | None, typer.Option(help="Glob relative to the Dag folder to add to the code zip (repeatable)")
     ] = None,
     exclude: Annotated[
-        list[str] | None, typer.Option(help="With --package: glob relative to the Dag folder to omit (repeatable)")
+        list[str] | None, typer.Option(help="Glob relative to the Dag folder to omit from the code zip (repeatable)")
     ] = None,
-    prefix: Annotated[str, typer.Option(help="With --package and --bucket: S3 key prefix for uploads")] = "",
+    prefix: Annotated[str, typer.Option(help="With --bucket: S3 key prefix for uploads")] = "",
 ):
     """
     Loads Python Dags from input and converts them to YAML Dags.
@@ -58,7 +57,7 @@ def convert(
         from dag_converter.conversion_manager import ConversionManager
 
         package_options = PackageOptions(includes=include or [], excludes=exclude or [], prefix=prefix)
-        conversion_manager = ConversionManager(s3_bucket=bucket, package_options=package_options if package else None)
+        conversion_manager = ConversionManager(s3_bucket=bucket, package_options=package_options)
         conversion_manager.start_conversion_process(
             dag_file_path=input_path, output_dir=output, user_validate=validate, debug=debug
         )

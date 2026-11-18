@@ -1,4 +1,4 @@
-"""Upload a converted Dag and its code package to S3 for MWAA Serverless (``--package --bucket``)."""
+"""Upload a converted Dag and its code package, if any, to S3 for MWAA Serverless (``--bucket``)."""
 
 import json
 import shlex
@@ -21,24 +21,25 @@ def _put(s3_client, bucket: str, key: str, path: Path) -> dict:
     return location
 
 
-def create_workflow_command(dag_id: str, definition: dict, code: dict) -> str:
+def create_workflow_command(dag_id: str, definition: dict, code: dict | None) -> str:
     return " \\\n  ".join(
         [
             "aws mwaa-serverless create-workflow",
             f"--name {shlex.quote(dag_id)}",
             f"--definition-s3-location {shlex.quote(json.dumps(definition))}",
-            f"--code {shlex.quote(json.dumps({'S3Location': code}))}",
+            *([f"--code {shlex.quote(json.dumps({'S3Location': code}))}"] if code else []),
             "--role-arn <EXECUTION_ROLE_ARN>",
         ]
     )
 
 
-def upload_package(s3_client, bucket: str, prefix: str, dag_id: str, yaml_path: Path, zip_path: Path) -> str:
-    """Upload to <prefix>dags/<dag_id>.yaml and <prefix>code/<dag_id>.zip; print and return the command."""
+def upload_package(s3_client, bucket: str, prefix: str, dag_id: str, yaml_path: Path, zip_path: Path | None) -> str:
+    """Upload to <prefix>dags/<dag_id>.yaml and, if there is a zip, <prefix>code/<dag_id>.zip; print and return
+    the create-workflow command."""
     prefix = f"{prefix.strip('/')}/" if prefix.strip("/") else ""
     try:
         definition = _put(s3_client, bucket, f"{prefix}dags/{dag_id}.yaml", yaml_path)
-        code = _put(s3_client, bucket, f"{prefix}code/{dag_id}.zip", zip_path)
+        code = _put(s3_client, bucket, f"{prefix}code/{dag_id}.zip", zip_path) if zip_path else None
     except Exception as e:
         print_error(f"Failed to upload to S3: {e}")
         raise

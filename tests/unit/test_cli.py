@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 from typer.testing import CliRunner
 
 from dag_converter.cli import app
+from dag_converter.code_package import PackageOptions
 
 runner = CliRunner(env={'NO_COLOR': '1', "TERM": 'dumb'})
 
@@ -47,7 +48,7 @@ class TestCli(unittest.TestCase):
         result = runner.invoke(app, ["convert", str(self.sample_dag_path)])
 
         self.assertEqual(result.exit_code, 0)
-        mock_conversion_manager.assert_called_once_with(s3_bucket="", package_options=None)
+        mock_conversion_manager.assert_called_once_with(s3_bucket="", package_options=PackageOptions())
         mock_manager.start_conversion_process.assert_called_once_with(
             dag_file_path=self.sample_dag_path, output_dir=Path("output_yaml/"), user_validate=True, debug=False
         )
@@ -76,7 +77,7 @@ class TestCli(unittest.TestCase):
         )
 
         self.assertEqual(result.exit_code, 0)
-        mock_conversion_manager.assert_called_once_with(s3_bucket=bucket_name, package_options=None)
+        mock_conversion_manager.assert_called_once_with(s3_bucket=bucket_name, package_options=PackageOptions())
         mock_manager.start_conversion_process.assert_called_once_with(
             dag_file_path=self.sample_dag_path, output_dir=output_path, user_validate=False, debug=True
         )
@@ -107,7 +108,7 @@ class TestCli(unittest.TestCase):
         result = runner.invoke(app, ["convert", str(self.sample_dag_path), "--bucket", bucket_name])
 
         self.assertEqual(result.exit_code, 0)
-        mock_conversion_manager.assert_called_once_with(s3_bucket=bucket_name, package_options=None)
+        mock_conversion_manager.assert_called_once_with(s3_bucket=bucket_name, package_options=PackageOptions())
 
     def test_convert_missing_input_path(self):
         """Test convert command fails when input path is missing."""
@@ -179,9 +180,9 @@ class TestCliNewOptions(unittest.TestCase):
 
     def test_help_lists_new_options(self):
         result = runner.invoke(app, ["convert", "--help"])
-        for option in ["--requirements", "--package", "--include", "--exclude"]:
+        for option in ["--requirements", "--include", "--exclude", "--prefix"]:
             self.assertIn(option, result.output)
-        for option in ["--dag-folder", "--airflow-home", "--conn", "--var"]:
+        for option in ["--dag-folder", "--airflow-home", "--conn", "--var", "--package", "--no-package"]:
             self.assertNotIn(option, result.output)
 
     @patch("dag_converter.conversion_manager.ConversionManager")
@@ -197,14 +198,16 @@ class TestCliNewOptions(unittest.TestCase):
 
     @patch("dag_converter.conversion_manager.ConversionManager")
     def test_package_options(self, mock_conversion_manager):
-        from dag_converter.code_package import PackageOptions
-
-        args = ["--package", "--include", "sql/*", "--exclude", "tmp", "--prefix", "p"]
+        args = ["--include", "sql/*", "--exclude", "tmp", "--prefix", "p"]
         result = runner.invoke(app, ["convert", str(self.sample_dag_path), *args])
         self.assertEqual(result.exit_code, 0, result.output)
         mock_conversion_manager.assert_called_once_with(
             s3_bucket="", package_options=PackageOptions(includes=["sql/*"], excludes=["tmp"], prefix="p")
         )
+
+    def test_package_flag_is_gone(self):
+        result = runner.invoke(app, ["convert", str(self.sample_dag_path), "--package"])
+        self.assertNotEqual(result.exit_code, 0)
 
     @patch("dag_converter.requirements_env.run_in_requirements_env", return_value=0)
     @patch("dag_converter.conversion_manager.ConversionManager")

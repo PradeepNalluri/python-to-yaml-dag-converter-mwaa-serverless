@@ -24,7 +24,7 @@ TEMPORARY_DAG_ID = "temp-id"
 class ConversionManager:
     def __init__(self, s3_bucket: str | None, package_options: code_package.PackageOptions | None = None):
         self.s3_bucket = s3_bucket
-        self.package_options = package_options
+        self.package_options = package_options or code_package.PackageOptions()
         self._dag_files: set[Path] = set()
         if s3_bucket:
             self.s3_client = boto3.client("s3")
@@ -72,8 +72,7 @@ class ConversionManager:
         try:
             return self._convert_file(dag_file_path, output_dir, user_validate, debug)
         finally:
-            if self.package_options:
-                code_package.evict_local_modules(parse_env.find_dag_root(dag_file_path))
+            code_package.evict_local_modules(parse_env.find_dag_root(dag_file_path))
 
     def _convert_file(self, dag_file_path: Path, output_dir: Path, user_validate: bool, debug: bool) -> list[str]:
         schema_file_path = Path(__file__).absolute().parent / VALIDATOR_SCHEMA_FILE
@@ -82,11 +81,7 @@ class ConversionManager:
         dag_root = parse_env.find_dag_root(dag_file_path)
         module_snapshot = set(sys.modules)
         dag_object_list = get_dag_object(dag_file_path)
-        file_modules = (
-            code_package.discover_file_modules(dag_file_path, dag_root, module_snapshot)
-            if self.package_options
-            else None
-        )
+        file_modules = code_package.discover_file_modules(dag_file_path, dag_root, module_snapshot)
 
         result_output_files: list[Path] = []
         result_output_yaml = []
@@ -118,23 +113,20 @@ class ConversionManager:
             taskflow_parser = TaskFlowAnalyzer(dag_file_path)
             dag_formatted = get_converted_format(taskflow_parser, dag_object, dag_file_path, validator)
             dag_cleaned = get_cleanup_dag(dag_formatted)
-            zip_path, validation_dict = None, None
-            py_sources = [dag_file_path]
-            if self.package_options:
-                dag_cleaned = code_package.rewrite_module_refs(dag_cleaned, dag_file_path, dag_root)
-                zip_path, py_sources = code_package.package_dag(
-                    dag_cleaned,
-                    dag_object.dag_id,
-                    dag_file_path,
-                    dag_root,
-                    file_modules,
-                    self.package_options,
-                    output_dir,
-                    self._dag_files,
-                )
-                py_sources = [dag_file_path, *py_sources]
-                validation_dict = dag_cleaned
-                dag_cleaned = code_package.rewrite_paths(dag_cleaned, dag_root)
+            # Local paths are validated as they are; with a zip, against its extracted copy
+            validation_dict = code_package.rewrite_module_refs(dag_cleaned, dag_file_path, dag_root)
+            zip_path, py_sources = code_package.package_dag(
+                validation_dict,
+                dag_object.dag_id,
+                dag_file_path,
+                dag_root,
+                file_modules,
+                self.package_options,
+                output_dir,
+                self._dag_files,
+            )
+            py_sources = [dag_file_path, *py_sources]
+            dag_cleaned = code_package.rewrite_paths(validation_dict, dag_root)
             compat_checks.run_checks(dag_object, dag_cleaned, py_sources, parse_env.state.requested_conn_ids)
             code_package.warn_local_paths(dag_cleaned, [str(dag_root)])
             dag_yaml = build_yaml(dag_cleaned)
@@ -146,7 +138,7 @@ class ConversionManager:
 
                 # Temporarily rename DAG to avoid conflicts in DagBag
                 old_dag_id = next(iter(dag_cleaned.keys()))
-                renamed_dict = {TEMPORARY_DAG_ID: dag_cleaned[old_dag_id]}
+                renamed_dict = {TEMPORARY_DAG_ID: validation_dict[old_dag_id]}
 
                 code_context = (
                     code_package.extracted_on_import_path(zip_path, dag_root) if zip_path else contextlib.nullcontext()
@@ -174,7 +166,7 @@ class ConversionManager:
                         f.write(str(dag_yaml))
                     print_success(f"YAML written to {output_path}")
 
-                if self.s3_bucket and zip_path:
+                if self.s3_bucket:
                     upload_package(
                         self.s3_client,
                         self.s3_bucket,
@@ -183,8 +175,6 @@ class ConversionManager:
                         output_path,
                         zip_path,
                     )
-                elif self.s3_bucket:
-                    self._upload_to_s3(output_path.name, output_path)
 
             print_info("\n\n----------------------------------------------------------------------------------\n\n")
             result_output_yaml.append(dag_yaml)
@@ -195,22 +185,3 @@ class ConversionManager:
             )
 
         return result_output_yaml
-
-    def _upload_to_s3(self, dag_file_name: str, output_path: Path):
-        """
-        Upload the DAG YAML content to the specified S3 bucket.
-
-        Args:
-            output_path (Path): File containing the YAML
-            dag_file_name (str): S3 file name
-        """
-        try:
-            print_progress(f"Attempting to upload DAG YAML to s3://{self.s3_bucket}/{dag_file_name}")
-            self.s3_client.upload_file(output_path, self.s3_bucket, dag_file_name)
-
-            print_success(f"Successfully uploaded DAG YAML to s3://{self.s3_bucket}/{dag_file_name}")
-            return f"s3://{self.s3_bucket}/{dag_file_name}"
-
-        except Exception as e:
-            print_error(f"Failed to upload DAG YAML to S3: {e}")
-            raise e

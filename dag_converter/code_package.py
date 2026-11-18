@@ -1,4 +1,4 @@
-"""Build a per-Dag code zip for MWAA Serverless (``--package``).
+"""Build a per-Dag code zip for MWAA Serverless, when the Dag needs one.
 
 The zip is extracted to /usr/local/airflow/dags on the service, which is on the import path, so
 local files are stored relative to the Dag folder root and third-party packages at the zip root.
@@ -618,8 +618,9 @@ def package_dag(
     options: PackageOptions,
     output_dir: Path,
     dag_files: set[Path],
-) -> tuple[Path, list[Path]]:
-    """Build ``<output>/<dag_id>.zip``; returns (zip path, local Python sources included)."""
+) -> tuple[Path | None, list[Path]]:
+    """Build ``<output>/<dag_id>.zip`` if the Dag needs local files or third-party packages; returns
+    (zip path or None, local Python sources included)."""
     module_files, external = file_modules
     yaml_modules, yaml_paths, yaml_external = yaml_references(dag_dict, dag_file, dag_root)
     yaml_local, yaml_ext2 = static_imports(yaml_modules, dag_root)
@@ -656,7 +657,11 @@ def package_dag(
             + ", ".join(sorted(secrets - files.keys()))
         )
 
-    staged = stage_distributions(third_party_distributions(external | yaml_external | yaml_ext2))
+    dists = third_party_distributions(external | yaml_external | yaml_ext2)
     zip_path = Path(output_dir) / f"{dag_id}.zip"
-    build_zip(zip_path, files, staged)
+    if not files and not dists:
+        zip_path.unlink(missing_ok=True)  # from an earlier run
+        print_info(f"No code package needed for {dag_id}")
+        return None, []
+    build_zip(zip_path, files, stage_distributions(dists))
     return zip_path, [f for f in files.values() if f.suffix == ".py"]
