@@ -48,7 +48,7 @@ class ConversionManager:
     def _convert_files(self, dag_file_path: Path, output_dir: Path, user_validate: bool, debug: bool) -> None:
         if dag_file_path.is_file():
             self.start_file_conversion_process(
-                dag_file_path=dag_file_path, output_dir=output_dir, user_validate=user_validate
+                dag_file_path=dag_file_path, output_dir=output_dir, user_validate=user_validate, debug=debug
             )
             return
 

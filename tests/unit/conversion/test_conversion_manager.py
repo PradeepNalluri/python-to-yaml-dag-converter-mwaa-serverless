@@ -91,6 +91,15 @@ class TestConversionManager(unittest.TestCase):
             content = f.read()
             self.assertEqual(content, mock_build_yaml.return_value)
 
+    def test_debug_passed_through_for_single_file_and_directory(self):
+        for path in (self.sample_dag_file, self.temp_dir):
+            manager = ConversionManager(s3_bucket=None)
+            with patch.object(manager, "start_file_conversion_process") as mock_convert_file:
+                manager.start_conversion_process(dag_file_path=path, output_dir=self.temp_output_dir, debug=True)
+            self.assertTrue(mock_convert_file.call_args_list, path)
+            for call in mock_convert_file.call_args_list:
+                self.assertIs(call.kwargs["debug"], True, path)
+
     @patch("dag_converter.conversion_manager.get_dag_object")
     @patch("dag_converter.conversion_manager.get_converted_format")
     @patch("dag_converter.conversion_manager.get_cleanup_dag")
